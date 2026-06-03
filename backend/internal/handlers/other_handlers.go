@@ -292,4 +292,3 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 
 	c.JSON(http.StatusOK, models.APIResponse{Success: true, Data: stats})
 }
-

@@ -5,6 +5,10 @@ import { useToast } from '../context/ToastContext';
 import { ArrowLeft, CheckCircle, XCircle, Send, Download, RefreshCw, Eye, BookOpen, Users, ChevronDown, User, Briefcase, Mail, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import api from '../api/axios';
 import { formatTanggal, formatTanggalShort, formatTanggalOnly, formatJabatan } from '../utils/formatDate';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 export default function SuratDetail({ type }) {
   const { id } = useParams();
@@ -238,7 +242,7 @@ export default function SuratDetail({ type }) {
           {/* Decorative circles */}
           <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
           <div style={{ position: 'absolute', bottom: -20, right: 60, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.03)' }} />
-          
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -267,8 +271,8 @@ export default function SuratDetail({ type }) {
               padding: '8px 18px', borderRadius: 30,
               background: currentStatus === 'disetujui' ? 'rgba(5, 150, 105, 0.9)'
                 : currentStatus === 'ditolak' ? 'rgba(220, 38, 38, 0.9)'
-                : currentStatus === 'diteruskan' ? 'rgba(59, 130, 246, 0.9)'
-                : 'rgba(217, 119, 6, 0.9)',
+                  : currentStatus === 'diteruskan' ? 'rgba(59, 130, 246, 0.9)'
+                    : 'rgba(217, 119, 6, 0.9)',
               color: '#ffffff', fontSize: '0.8rem', fontWeight: 700,
               letterSpacing: '0.3px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
               textTransform: 'uppercase', whiteSpace: 'nowrap'
@@ -534,10 +538,10 @@ export default function SuratDetail({ type }) {
               <label style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: 6, display: 'block' }}>
                 Keputusan Peninjauan *
               </label>
-              <select 
-                className="form-input" 
-                value={reviewForm.status} 
-                onChange={e => setReviewForm({...reviewForm, status: e.target.value})}
+              <select
+                className="form-input"
+                value={reviewForm.status}
+                onChange={e => setReviewForm({ ...reviewForm, status: e.target.value })}
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -560,12 +564,12 @@ export default function SuratDetail({ type }) {
               <label style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: 6, display: 'block' }}>
                 Catatan Peninjauan
               </label>
-              <textarea 
-                className="form-input" 
-                value={reviewForm.catatan} 
-                onChange={e => setReviewForm({...reviewForm, catatan: e.target.value})} 
-                placeholder="Tambahkan instruksi, disposisi verbal, atau catatan penolakan..." 
-                rows={3} 
+              <textarea
+                className="form-input"
+                value={reviewForm.catatan}
+                onChange={e => setReviewForm({ ...reviewForm, catatan: e.target.value })}
+                placeholder="Tambahkan instruksi, disposisi verbal, atau catatan penolakan..."
+                rows={3}
                 style={{
                   width: '100%',
                   padding: '12px 14px',
@@ -603,8 +607,8 @@ export default function SuratDetail({ type }) {
                   {daftarPenerima.map(nama => {
                     const isSelected = selectedPenerima.includes(nama);
                     return (
-                      <label 
-                        key={nama} 
+                      <label
+                        key={nama}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -647,9 +651,9 @@ export default function SuratDetail({ type }) {
 
             {/* Action button */}
             <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-              <button 
-                className="btn btn-primary" 
-                onClick={handleReview} 
+              <button
+                className="btn btn-primary"
+                onClick={handleReview}
                 disabled={reviewLoading}
                 style={{
                   padding: '10px 24px',
@@ -1001,25 +1005,11 @@ function PdfViewer({ file, filename }) {
 
   useEffect(() => {
     let active = true;
-    const loadPdfjs = async () => {
-      if (!window.pdfjsLib) {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
-        script.async = true;
-        document.body.appendChild(script);
-        await new Promise((resolve, reject) => {
-          script.onload = resolve;
-          script.onerror = () => reject(new Error('Gagal memuat engine PDF.js'));
-        });
-      }
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-    };
 
     const renderPdf = async () => {
       try {
         setLoading(true);
         setError(null);
-        await loadPdfjs();
         if (!active) return;
 
         // Dynamically resolve backend root URL from Axios baseURL configuration
@@ -1030,7 +1020,7 @@ function PdfViewer({ file, filename }) {
         const response = await api.get(fileURL, { responseType: 'arraybuffer' });
         if (!active) return;
 
-        const loadingTask = window.pdfjsLib.getDocument({ data: new Uint8Array(response.data) });
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(response.data) });
         const pdf = await loadingTask.promise;
         if (!active) return;
 
@@ -1095,9 +1085,9 @@ function PdfViewer({ file, filename }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button 
-            className="btn btn-ghost btn-sm" 
-            onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} 
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}
             style={{ padding: '6px 10px', color: 'white', borderColor: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', borderRadius: 6 }}
             title="Perkecil"
           >
@@ -1106,17 +1096,17 @@ function PdfViewer({ file, filename }) {
           <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffffff', minWidth: 50, textAlign: 'center' }}>
             {Math.round(zoom * 100)}%
           </span>
-          <button 
-            className="btn btn-ghost btn-sm" 
-            onClick={() => setZoom(z => Math.min(2.5, z + 0.25))} 
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setZoom(z => Math.min(2.5, z + 0.25))}
             style={{ padding: '6px 10px', color: 'white', borderColor: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', borderRadius: 6 }}
             title="Perbesar"
           >
             <ZoomIn size={14} />
           </button>
-          <button 
-            className="btn btn-ghost btn-sm" 
-            onClick={() => setZoom(1.0)} 
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setZoom(1.0)}
             style={{ padding: '6px 10px', color: 'white', borderColor: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}
             title="Reset Zoom"
           >
@@ -1161,11 +1151,11 @@ function PdfPage({ pdf, pageNum, zoom }) {
 
         const context = canvas.getContext('2d');
         const originalViewport = page.getViewport({ scale: 1.0 });
-        
+
         const targetWidth = 780;
         const scale = (targetWidth / originalViewport.width) * zoom;
         const viewport = page.getViewport({ scale });
-        
+
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
@@ -1173,7 +1163,7 @@ function PdfPage({ pdf, pageNum, zoom }) {
           canvasContext: context,
           viewport: viewport
         };
-        
+
         renderTask = page.render(renderContext);
         await renderTask.promise;
         if (active) {
