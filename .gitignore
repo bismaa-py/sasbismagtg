@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Production builds
+dist/
+frontend/dist/
+
+# Local env files
+.env
+backend/.env
+
+# Binaries
+*.exe
+backend/server.exe
+backend/server
+
+# Logs
+*.log
+
+# Uploads directory files
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# IDE configs
+.vscode/
+.idea/
+.gemini/
