@@ -109,6 +109,7 @@ func (h *SuratMasukHandler) Create(c *gin.Context) {
 }
 
 // List: admin/kepsek see only menunggu+belum dikirim, users see their forwarded surat (unconfirmed only)
+// waka sees surat forwarded to them by TU (not yet forwarded to user)
 func (h *SuratMasukHandler) List(c *gin.Context) {
 	status := c.Query("status")
 	role, _ := c.Get("role")
@@ -120,8 +121,11 @@ func (h *SuratMasukHandler) List(c *gin.Context) {
 	var list []models.SuratMasuk
 	var err error
 
-	// Users only see surat that were forwarded to them AND not yet confirmed
-	if role == "user" {
+	if role == "waka" {
+		// Waka sees surat forwarded to them (not yet forwarded to user)
+		list, err = h.smRepo.FindByWakaRecipient(userID, dateFrom, dateTo)
+	} else if role == "user" {
+		// Users only see surat that were forwarded to them AND not yet confirmed
 		var jabID int
 		if jabatanID != "" {
 			jabID, _ = strconv.Atoi(jabatanID)
@@ -163,7 +167,10 @@ func (h *SuratMasukHandler) ListHistory(c *gin.Context) {
 	var list []models.SuratMasuk
 	var err error
 
-	if role == "user" {
+	if role == "waka" {
+		// Waka: surat yang sudah diteruskan ke user (history waka)
+		list, err = h.smRepo.FindByWakaRecipientHistory(userID, dateFrom, dateTo)
+	} else if role == "user" {
 		var jabID int
 		if jabatanID != "" {
 			jabID, _ = strconv.Atoi(jabatanID)
@@ -196,25 +203,25 @@ func (h *SuratMasukHandler) GetByID(c *gin.Context) {
 
 	// Auto-read: jika user membuka surat dan punya disposisi belum dibaca, otomatis tandai dibaca
 	userID := c.GetInt("user_id")
+	role, _ := c.Get("role")
 	_ = h.notifRepo.MarkAsReadByReferensi(userID, id, "surat_masuk")
 	hasUpdated := false
-	for _, d := range disposisi {
-		if d.IDPenerima == userID && d.StatusDisposisi != "dibaca" {
-			// Tandai disposisi sebagai dibaca
-			err := h.dispRepo.UpdateStatusDisposisi(d.ID, userID, "dibaca")
-			if err == nil {
-				hasUpdated = true
+	// Only auto-read for regular users (not waka — waka needs to forward first)
+	if role == "user" {
+		for _, d := range disposisi {
+			if d.IDPenerima == userID && d.StatusDisposisi != "dibaca" {
+				err := h.dispRepo.UpdateStatusDisposisi(d.ID, userID, "dibaca")
+				if err == nil {
+					hasUpdated = true
+				}
 			}
 		}
 	}
 	if hasUpdated {
-		// Get user name for notification
 		userName := "User"
 		if u, err := h.userRepo.FindByID(userID); err == nil {
 			userName = u.Nama
 		}
-
-		// Notify admin/TU bahwa user sudah membuka surat
 		admins, _ := h.userRepo.FindByRole("admin")
 		pegawai, _ := h.userRepo.FindByRole("pegawai")
 		allTargets := append(admins, pegawai...)
@@ -228,11 +235,13 @@ func (h *SuratMasukHandler) GetByID(c *gin.Context) {
 				TipeReferensi: "surat_masuk",
 			})
 		}
-
 		h.actRepo.Create(&models.ActivityLog{IDUser: userID, Aksi: "BUKA_SURAT", TabelTerkait: "disposisi"})
-
-		// Re-fetch disposisi setelah update agar response terbaru
 		disposisi, _ = h.dispRepo.FindBySuratMasukID(id)
+	}
+
+	// Sembunyikan catatan kepsek dari user biasa (hanya sampai waka)
+	if role == "user" {
+		surat.CatatanVerifikasi = ""
 	}
 
 	c.JSON(http.StatusOK, models.APIResponse{Success: true, Data: gin.H{"surat": surat, "disposisi": disposisi}})
@@ -318,7 +327,7 @@ func (h *SuratMasukHandler) Review(c *gin.Context) {
 	c.JSON(http.StatusOK, models.APIResponse{Success: true, Message: "Surat berhasil di-review"})
 }
 
-// Forward: ADMIN ONLY - forward approved surat to users (with optional jabatan)
+// Forward: ADMIN/TU ONLY - forward approved surat to WAKA (not directly to user anymore)
 func (h *SuratMasukHandler) Forward(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	surat, err := h.smRepo.FindByID(id)
@@ -337,7 +346,7 @@ func (h *SuratMasukHandler) Forward(c *gin.Context) {
 	}
 	userID := c.GetInt("user_id")
 
-	// New format: targets with jabatan
+	// New flow: TU forwards to Waka only
 	if len(req.Targets) > 0 {
 		for _, t := range req.Targets {
 			jabatanID := t.JabatanID
@@ -349,7 +358,6 @@ func (h *SuratMasukHandler) Forward(c *gin.Context) {
 			h.notifRepo.Create(&models.Notification{IDPenerima: t.UserID, IDPengirim: &userID, Judul: "Surat Baru Untuk Anda", Pesan: "Disposisi: " + surat.PerihalSurat, Jenis: "surat_diteruskan", TipeReferensi: "surat_masuk", IDReferensi: &id})
 		}
 	} else if len(req.DiteruskanKe) > 0 {
-		// Old format: just user IDs (backward compat)
 		for _, uid := range req.DiteruskanKe {
 			h.dispRepo.Create(&models.Disposisi{IDSuratMasuk: id, IDKepsek: userID, IDPenerima: uid})
 			h.notifRepo.Create(&models.Notification{IDPenerima: uid, IDPengirim: &userID, Judul: "Surat Baru Untuk Anda", Pesan: "Disposisi: " + surat.PerihalSurat, Jenis: "surat_diteruskan", TipeReferensi: "surat_masuk", IDReferensi: &id})
@@ -359,9 +367,88 @@ func (h *SuratMasukHandler) Forward(c *gin.Context) {
 		return
 	}
 
-	h.smRepo.UpdateStatusAlur(id, "diteruskan")
-	h.actRepo.Create(&models.ActivityLog{IDUser: userID, Aksi: "TERUSKAN_SURAT", TabelTerkait: "surat_masuk"})
-	c.JSON(http.StatusOK, models.APIResponse{Success: true, Message: "Surat berhasil diteruskan"})
+	// Status alur: diteruskan_waka (bukan 'diteruskan' — karena belum sampai user akhir)
+	if err := h.smRepo.UpdateStatusAlur(id, "diteruskan_waka"); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{Success: false, Message: "Gagal memperbarui alur surat: " + err.Error()})
+		return
+	}
+	h.actRepo.Create(&models.ActivityLog{IDUser: userID, Aksi: "TERUSKAN_SURAT_KE_WAKA", TabelTerkait: "surat_masuk"})
+	c.JSON(http.StatusOK, models.APIResponse{Success: true, Message: "Surat berhasil diteruskan ke Waka"})
+}
+
+// ForwardWaka: WAKA ONLY - forward surat to individual users with catatan
+func (h *SuratMasukHandler) ForwardWaka(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	surat, err := h.smRepo.FindByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{Success: false, Message: "Surat tidak ditemukan"})
+		return
+	}
+
+	var req models.ForwardWakaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{Success: false, Message: "Pilih minimal 1 penerima"})
+		return
+	}
+
+	wakaUserID := c.GetInt("user_id")
+
+	// Create disposisi for each user (with id_waka = wakaUserID, catatan_waka)
+	for _, uid := range req.DiteruskanKe {
+		h.dispRepo.Create(&models.Disposisi{
+			IDSuratMasuk: id,
+			IDKepsek:     wakaUserID,
+			IDPenerima:   uid,
+			IDWaka:       &wakaUserID,
+			CatatanWaka:  req.CatatanWaka,
+		})
+		h.notifRepo.Create(&models.Notification{
+			IDPenerima:    uid,
+			IDPengirim:    &wakaUserID,
+			Judul:         "Surat Baru Untuk Anda",
+			Pesan:         "Disposisi dari Waka: " + surat.PerihalSurat,
+			Jenis:         "surat_diteruskan",
+			TipeReferensi: "surat_masuk",
+			IDReferensi:   &id,
+		})
+	}
+
+	// Mark waka's own disposisi as 'dibaca' (move to waka's history)
+	disposisi, _ := h.dispRepo.FindBySuratMasukID(id)
+	for _, d := range disposisi {
+		if d.IDPenerima == wakaUserID && d.StatusDisposisi != "dibaca" {
+			h.dispRepo.UpdateStatusDisposisi(d.ID, wakaUserID, "dibaca")
+		}
+	}
+
+	// Update status alur to 'diteruskan' (now it's fully forwarded to end users)
+	if err := h.smRepo.UpdateStatusAlur(id, "diteruskan"); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{Success: false, Message: "Gagal memperbarui alur surat: " + err.Error()})
+		return
+	}
+	h.actRepo.Create(&models.ActivityLog{IDUser: wakaUserID, Aksi: "TERUSKAN_SURAT_WAKA_KE_USER", TabelTerkait: "surat_masuk"})
+
+	// Notify admin/TU
+	admins, _ := h.userRepo.FindByRole("admin")
+	pegawai, _ := h.userRepo.FindByRole("pegawai")
+	wakaName := "Waka"
+	if u, err := h.userRepo.FindByID(wakaUserID); err == nil {
+		wakaName = u.Nama
+	}
+	allTargets := append(admins, pegawai...)
+	for _, a := range allTargets {
+		h.notifRepo.Create(&models.Notification{
+			IDPenerima:    a.ID,
+			IDPengirim:    &wakaUserID,
+			Judul:         "Surat Diteruskan oleh Waka",
+			Pesan:         wakaName + " meneruskan surat ke " + strconv.Itoa(len(req.DiteruskanKe)) + " user",
+			Jenis:         "surat_diteruskan",
+			TipeReferensi: "surat_masuk",
+			IDReferensi:   &id,
+		})
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{Success: true, Message: "Surat berhasil diteruskan ke pengguna"})
 }
 
 func (h *SuratMasukHandler) Archive(c *gin.Context) {
@@ -371,7 +458,10 @@ func (h *SuratMasukHandler) Archive(c *gin.Context) {
 		c.JSON(http.StatusNotFound, models.APIResponse{Success: false, Message: "Surat tidak ditemukan"})
 		return
 	}
-	h.smRepo.UpdateStatusAlur(id, "selesai")
+	if err := h.smRepo.UpdateStatusAlur(id, "selesai"); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{Success: false, Message: "Gagal memperbarui alur surat: " + err.Error()})
+		return
+	}
 	h.actRepo.Create(&models.ActivityLog{IDUser: c.GetInt("user_id"), Aksi: "ARSIP_SURAT", TabelTerkait: "surat_masuk"})
 	c.JSON(http.StatusOK, models.APIResponse{Success: true, Message: "Surat diarsipkan"})
 }

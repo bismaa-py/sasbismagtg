@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { LayoutDashboard, Mail, Send, Users, ClipboardList, User, History, LogOut, AlertTriangle, RefreshCw, BookOpen, Briefcase } from 'lucide-react';
 import { formatJabatan } from '../../utils/formatDate';
+import { getUploadUrl } from '../../utils/urlHelper';
 export default function Sidebar({ open, onClose }) {
   const { user, logout, activeJabatanFilter, setActiveJabatanFilter } = useAuth();
   const navigate = useNavigate();
@@ -24,10 +25,10 @@ export default function Sidebar({ open, onClose }) {
   };
 
   const navItems = [
-    { to: '/dashboard', icon: <LayoutDashboard />, label: 'Beranda', roles: ['admin', 'kepsek', 'user', 'pegawai'] },
-    { to: '/surat-masuk', icon: <Mail />, label: 'Surat Masuk', roles: ['admin', 'kepsek', 'user', 'pegawai'] },
+    { to: '/dashboard', icon: <LayoutDashboard />, label: 'Beranda', roles: ['admin', 'kepsek', 'user', 'pegawai', 'waka'] },
+    { to: '/surat-masuk', icon: <Mail />, label: 'Surat Masuk', roles: ['admin', 'kepsek', 'user', 'pegawai', 'waka'] },
     { to: '/surat-keluar', icon: <Send />, label: 'Surat Keluar', roles: ['admin', 'kepsek', 'pegawai'] },
-    { to: '/riwayat', icon: <History />, label: 'Riwayat', roles: ['admin', 'kepsek', 'user', 'pegawai'] },
+    { to: '/riwayat', icon: <History />, label: 'Riwayat', roles: ['admin', 'kepsek', 'user', 'pegawai', 'waka'] },
   ];
 
   const adminItems = [
@@ -103,7 +104,7 @@ export default function Sidebar({ open, onClose }) {
           <div className="user-info">
             <div className="user-avatar">
               {user?.foto_profil ? (
-                <img src={`http://localhost:8080/uploads/${user.foto_profil}`} alt="" />
+                <img src={getUploadUrl(user?.foto_profil)} alt="" />
               ) : (
                 user?.nama?.charAt(0).toUpperCase()
               )}
@@ -131,8 +132,38 @@ export default function Sidebar({ open, onClose }) {
             </button>
           )}
 
-          <button className="nav-link" onClick={handleLogoutClick} style={{ marginTop: 4, color: '#f87171' }}>
-            <LogOut /> Keluar
+          <button
+            onClick={handleLogoutClick}
+            style={{
+              marginTop: 12,
+              color: '#f87171',
+              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              width: '100%',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: '0.88rem',
+              transition: 'all 0.2s ease',
+              fontFamily: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#dc2626';
+              e.currentTarget.style.borderColor = '#dc2626';
+              e.currentTarget.style.color = '#ffffff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+              e.currentTarget.style.color = '#f87171';
+            }}
+          >
+            <LogOut size={16} /> Keluar
           </button>
         </div>
       </aside>

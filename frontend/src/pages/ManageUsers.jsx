@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, X, Users, Search, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import api from '../api/axios';
 import { useToast } from '../context/ToastContext';
-import { formatJabatan } from '../utils/formatDate';
+import { formatJabatan, parseBackendDate } from '../utils/formatDate';
 
 // Daftar jabatan dengan ID dan nama untuk dropdown (sesuai database)
 const jabatanOptions = [
@@ -13,20 +13,7 @@ const jabatanOptions = [
   { id: 6, nama: 'Waka Kurikulum' },
   { id: 7, nama: 'Waka Sarpras' },
   { id: 8, nama: 'Waka Humas' },
-  { id: 9, nama: 'BKK' },
-  { id: 11, nama: 'Kapro RPL' },
-  { id: 12, nama: 'Kapro TKJ' },
-  { id: 13, nama: 'Kapro DKV' },
-  { id: 14, nama: 'Kapro AN' },
-  { id: 15, nama: 'Kapro EI' },
-  { id: 16, nama: 'Kapro MT' },
-  { id: 17, nama: 'Kapro AV' },
-  { id: 18, nama: 'Kapro BC' },
-  { id: 19, nama: 'BK' },
-  { id: 20, nama: 'Prakerin' },
-  { id: 21, nama: 'Koordinator Waka' },
-  { id: 22, nama: 'Koordinator BK' },
-  { id: 23, nama: 'Koordinator BKK' }
+  { id: 24, nama: 'Guru' }
 ];
 
 export default function ManageUsers() {
@@ -46,8 +33,12 @@ export default function ManageUsers() {
   useEffect(() => { fetchUsers(); }, []);
 
   const fetchUsers = async () => {
-    const res = await api.get('/users');
-    if (res.data.success) setUsers(res.data.data || []);
+    try {
+      const res = await api.get('/users');
+      if (res.data.success) setUsers(res.data.data || []);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Gagal mengambil data pengguna', 'error');
+    }
   };
 
   // Validasi kata sandi: min 8 karakter, huruf besar, huruf kecil, angka
@@ -123,16 +114,9 @@ export default function ManageUsers() {
     }
   };
 
-  // Toggle jabatan di multi-select
+  // Pilih jabatan (single select / tidak bisa double jabatan)
   const toggleJabatan = (jabatanId) => {
-    setForm(prev => {
-      const current = prev.id_jabatan || [];
-      if (current.includes(jabatanId)) {
-        return { ...prev, id_jabatan: current.filter(id => id !== jabatanId) };
-      } else {
-        return { ...prev, id_jabatan: [...current, jabatanId] };
-      }
-    });
+    setForm(prev => ({ ...prev, id_jabatan: [jabatanId] }));
   };
 
   const openCreate = () => { setEditItem(null); setForm({ email: '', nama: '', password: '', id_jabatan: [] }); setPwError(''); setShowPassword(false); setShowModal(true); };
@@ -146,11 +130,12 @@ export default function ManageUsers() {
   };
   const closeModal = () => { setShowModal(false); setEditItem(null); setPwError(''); setShowPassword(false); };
 
-  const roleLabel = { admin: 'Admin/TU', pegawai: 'Pegawai TU', kepsek: 'Kepala Sekolah', user: 'Pengguna' };
+  const roleLabel = { admin: 'Admin/TU', pegawai: 'Pegawai TU', kepsek: 'Kepala Sekolah', waka: 'Waka', user: 'Pengguna' };
 
   const formatDate = (d) => {
     if (!d) return '-';
-    return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+    const parsed = parseBackendDate(d);
+    return parsed ? parsed.date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
   };
 
   // Search highlight helper
@@ -161,7 +146,7 @@ export default function ManageUsers() {
     const parts = String(text).split(regex);
     return parts.map((part, i) =>
       regex.test(part) ? (
-        <mark key={i} style={{ backgroundColor: '#fef08a', color: '#0f2b52', padding: '0 2px', borderRadius: '2px' }}>
+        <mark key={i} style={{ backgroundColor: '#dbeafe', color: '#0f2b52', padding: '2px 4px', borderRadius: '4px', fontWeight: 600 }}>
           {part}
         </mark>
       ) : (
@@ -332,7 +317,7 @@ export default function ManageUsers() {
                 {/* Jabatan checklist dalam grid yang profesional */}
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: 8, display: 'block' }}>
-                    Pilih Jabatan * <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(pilih satu atau lebih)</span>
+                    Pilih Jabatan *
                   </label>
                   <div style={{
                     border: '1.5px solid var(--border-color)',
@@ -375,7 +360,8 @@ export default function ManageUsers() {
                           }}
                         >
                           <input
-                            type="checkbox"
+                            type="radio"
+                            name="jabatan"
                             checked={isSelected}
                             onChange={() => toggleJabatan(j.id)}
                             style={{
@@ -390,9 +376,6 @@ export default function ManageUsers() {
                       );
                     })}
                   </div>
-                  <small style={{ color: 'var(--text-muted)', fontSize: '0.73rem', display: 'block', marginTop: 6 }}>
-                    Jabatan pertama yang Anda pilih akan secara otomatis dijadikan sebagai jabatan utama (primary).
-                  </small>
                 </div>
               </div>
               <div className="modal-footer" style={{ marginTop: 8 }}>

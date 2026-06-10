@@ -133,10 +133,10 @@ func (r *SuratMasukRepository) FindHistory(statusFilter string) ([]models.SuratM
 	if statusFilter == "ditolak" {
 		query = smSelectQuery + " WHERE status_verifikasi = 'ditolak'"
 	} else if statusFilter == "disetujui" {
-		query = smSelectQuery + " WHERE status_verifikasi = 'disetujui' AND status_alur IN ('diteruskan','selesai')"
+		query = smSelectQuery + " WHERE status_verifikasi = 'disetujui' AND status_alur IN ('diteruskan','diteruskan_waka','selesai')"
 	} else {
-		// Default: show ditolak + diteruskan/selesai (truly completed)
-		query = smSelectQuery + " WHERE status_verifikasi = 'ditolak' OR (status_verifikasi = 'disetujui' AND status_alur IN ('diteruskan','selesai'))"
+		// Default: show ditolak + diteruskan/diteruskan_waka/selesai (truly completed)
+		query = smSelectQuery + " WHERE status_verifikasi = 'ditolak' OR (status_verifikasi = 'disetujui' AND status_alur IN ('diteruskan','diteruskan_waka','selesai'))"
 	}
 	query += " ORDER BY created_at DESC"
 	rows, err := r.db.Query(query)
@@ -234,6 +234,24 @@ func (r *SuratMasukRepository) CountHistory() (int, error) {
 	return count, err
 }
 
+// CountActive: count active surat masuk for admin/pegawai (menunggu OR disetujui but not yet forwarded)
+func (r *SuratMasukRepository) CountActive() (int, error) {
+	var count int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM surat_masuk WHERE 
+		status_verifikasi = 'menunggu' 
+		OR (status_verifikasi = 'disetujui' AND (status_alur IS NULL OR status_alur = 'disposisi_kepsek'))`).Scan(&count)
+	return count, err
+}
+
+// CountHistoryForAdmin: count history for admin/pegawai (ditolak OR disetujui and forwarded)
+func (r *SuratMasukRepository) CountHistoryForAdmin() (int, error) {
+	var count int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM surat_masuk WHERE 
+		status_verifikasi = 'ditolak' 
+		OR (status_verifikasi = 'disetujui' AND status_alur IN ('diteruskan','diteruskan_waka','selesai'))`).Scan(&count)
+	return count, err
+}
+
 // Count menunggu for both surat masuk and surat keluar (for dashboard)
 func (r *SuratMasukRepository) CountMenunggu() (int, error) {
 	var count int
@@ -313,9 +331,9 @@ func (r *SuratMasukRepository) FindHistoryWithDateRange(statusFilter, dateFrom, 
 	if statusFilter == "ditolak" {
 		query = smSelectQuery + " WHERE status_verifikasi = 'ditolak'"
 	} else if statusFilter == "disetujui" {
-		query = smSelectQuery + " WHERE status_verifikasi = 'disetujui' AND status_alur IN ('diteruskan','selesai')"
+		query = smSelectQuery + " WHERE status_verifikasi = 'disetujui' AND status_alur IN ('diteruskan','diteruskan_waka','selesai')"
 	} else {
-		query = smSelectQuery + " WHERE status_verifikasi = 'ditolak' OR (status_verifikasi = 'disetujui' AND status_alur IN ('diteruskan','selesai'))"
+		query = smSelectQuery + " WHERE status_verifikasi = 'ditolak' OR (status_verifikasi = 'disetujui' AND status_alur IN ('diteruskan','diteruskan_waka','selesai'))"
 	}
 	args := []interface{}{}
 	if dateFrom != "" {
@@ -551,3 +569,125 @@ func (r *SuratMasukRepository) CountByRecipientUserConfirmed(userID int) (int, e
 	return count, err
 }
 
+// FindByWakaRecipient: Surat yang diteruskan ke waka (belum diteruskan ke user)
+func (r *SuratMasukRepository) FindByWakaRecipient(wakaUserID int, dateFrom, dateTo string) ([]models.SuratMasuk, error) {
+	query := `SELECT sm.id_surat_masuk, sm.no_surat, sm.perihal_surat, sm.asal_surat, sm.tanggal_surat,
+		COALESCE(sm.file_pdf,''), sm.tanggal_diterima, COALESCE(sm.status_verifikasi,'menunggu'),
+		sm.user_verifikasi, sm.tanggal_verifikasi, sm.catatan_verifikasi,
+		sm.created_at, sm.id_disposisi_aktif, sm.status_alur, sm.updated_at,
+		d.id_disposisi, COALESCE(d.status_disposisi,'belum_dibaca')
+		FROM surat_masuk sm
+		INNER JOIN disposisi d ON sm.id_surat_masuk = d.id_surat_masuk
+		WHERE d.id_penerima = $1 AND d.id_waka IS NULL AND d.status_disposisi != 'dibaca'`
+	args := []interface{}{wakaUserID}
+	argIdx := 2
+	if dateFrom != "" {
+		query += fmt.Sprintf(" AND sm.tanggal_surat >= $%d", argIdx)
+		args = append(args, dateFrom)
+		argIdx++
+		if dateTo != "" {
+			query += fmt.Sprintf(" AND sm.tanggal_surat <= $%d", argIdx)
+			args = append(args, dateTo)
+			argIdx++
+		}
+	} else if dateTo != "" {
+		query += fmt.Sprintf(" AND sm.tanggal_surat <= $%d", argIdx)
+		args = append(args, dateTo)
+		argIdx++
+	}
+	query += " ORDER BY sm.created_at DESC"
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []models.SuratMasuk
+	for rows.Next() {
+		s := &models.SuratMasuk{}
+		var userVerif sql.NullInt64
+		var tglVerif sql.NullTime
+		var idDispAktif sql.NullInt64
+		var catatanVerif, tglDiterima, statusAlur sql.NullString
+		var dispID int
+		var dispStatus string
+		err := rows.Scan(
+			&s.ID, &s.NoSurat, &s.PerihalSurat, &s.AsalSurat, &s.TanggalSurat,
+			&s.FilePDF, &tglDiterima, &s.StatusVerifikasi, &userVerif, &tglVerif,
+			&catatanVerif, &s.CreatedAt, &idDispAktif, &statusAlur, &s.UpdatedAt,
+			&dispID, &dispStatus,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if userVerif.Valid { v := int(userVerif.Int64); s.UserVerifikasi = &v }
+		if tglVerif.Valid { s.TanggalVerifikasi = &tglVerif.Time }
+		if idDispAktif.Valid { v := int(idDispAktif.Int64); s.IDDisposisiAktif = &v }
+		if catatanVerif.Valid { s.CatatanVerifikasi = catatanVerif.String }
+		if tglDiterima.Valid { s.TanggalDiterima = tglDiterima.String }
+		if statusAlur.Valid { s.StatusAlur = statusAlur.String }
+		s.DisposisiID = &dispID
+		s.DisposisiStatus = dispStatus
+		list = append(list, *s)
+	}
+	return list, nil
+}
+
+// FindByWakaRecipientHistory: Surat yang sudah diteruskan oleh waka (disposisi waka sudah 'dibaca')
+func (r *SuratMasukRepository) FindByWakaRecipientHistory(wakaUserID int, dateFrom, dateTo string) ([]models.SuratMasuk, error) {
+	query := `SELECT sm.id_surat_masuk, sm.no_surat, sm.perihal_surat, sm.asal_surat, sm.tanggal_surat,
+		COALESCE(sm.file_pdf,''), sm.tanggal_diterima, COALESCE(sm.status_verifikasi,'menunggu'),
+		sm.user_verifikasi, sm.tanggal_verifikasi, sm.catatan_verifikasi,
+		sm.created_at, sm.id_disposisi_aktif, sm.status_alur, sm.updated_at
+		FROM surat_masuk sm
+		INNER JOIN disposisi d ON sm.id_surat_masuk = d.id_surat_masuk
+		WHERE d.id_penerima = $1 AND d.id_waka IS NULL AND d.status_disposisi = 'dibaca'`
+	args := []interface{}{wakaUserID}
+	argIdx := 2
+	if dateFrom != "" {
+		query += fmt.Sprintf(" AND sm.tanggal_surat >= $%d", argIdx)
+		args = append(args, dateFrom)
+		argIdx++
+		if dateTo != "" {
+			query += fmt.Sprintf(" AND sm.tanggal_surat <= $%d", argIdx)
+			args = append(args, dateTo)
+			argIdx++
+		}
+	} else if dateTo != "" {
+		query += fmt.Sprintf(" AND sm.tanggal_surat <= $%d", argIdx)
+		args = append(args, dateTo)
+		argIdx++
+	}
+	query += " ORDER BY sm.created_at DESC"
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []models.SuratMasuk
+	for rows.Next() {
+		s, err := scanSuratMasuk(rows)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, *s)
+	}
+	return list, nil
+}
+
+// CountByWakaUnconfirmed: Count surat forwarded to waka but not yet forwarded to user
+func (r *SuratMasukRepository) CountByWakaUnconfirmed(wakaUserID int) (int, error) {
+	var count int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM surat_masuk sm
+		INNER JOIN disposisi d ON sm.id_surat_masuk = d.id_surat_masuk
+		WHERE d.id_penerima = $1 AND d.id_waka IS NULL AND d.status_disposisi != 'dibaca'`, wakaUserID).Scan(&count)
+	return count, err
+}
+
+// CountByWakaConfirmed: Count surat already forwarded by waka to user (history)
+func (r *SuratMasukRepository) CountByWakaConfirmed(wakaUserID int) (int, error) {
+	var count int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM surat_masuk sm
+		INNER JOIN disposisi d ON sm.id_surat_masuk = d.id_surat_masuk
+		WHERE d.id_penerima = $1 AND d.id_waka IS NULL AND d.status_disposisi = 'dibaca'`, wakaUserID).Scan(&count)
+	return count, err
+}

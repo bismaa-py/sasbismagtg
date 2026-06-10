@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -263,31 +264,47 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 	stats := models.DashboardStats{}
 
 	role, _ := c.Get("role")
+	userID := c.GetInt("user_id")
+	log.Printf("DEBUG Stats - userID: %d, role: %v", userID, role)
 
 	if role == "user" {
 		// User only sees Surat Masuk (forwarded, unconfirmed), Surat Keluar, History (confirmed)
-		userID := c.GetInt("user_id")
 		// Surat Masuk = only unconfirmed surat (belum diterima)
 		stats.TotalSuratMasuk, _ = h.smRepo.CountByRecipientUserUnconfirmed(userID)
-		stats.TotalSuratKeluar, _ = h.skRepo.CountAll()
+		stats.TotalSuratKeluar, _ = h.skRepo.CountByStatus("menunggu")
 		// History = only confirmed/received surat
 		stats.TotalHistory, _ = h.smRepo.CountByRecipientUserConfirmed(userID)
+		log.Printf("DEBUG Stats USER - TotalSuratMasuk: %d, TotalSuratKeluar: %d, TotalHistory: %d", stats.TotalSuratMasuk, stats.TotalSuratKeluar, stats.TotalHistory)
+	} else if role == "waka" {
+		// Waka sees: Surat Masuk (forwarded to them, not yet forwarded to user) + History (already forwarded)
+		stats.TotalSuratMasuk, _ = h.smRepo.CountByWakaUnconfirmed(userID)
+		stats.TotalHistory, _ = h.smRepo.CountByWakaConfirmed(userID)
+		log.Printf("DEBUG Stats WAKA - TotalSuratMasuk: %d, TotalHistory: %d", stats.TotalSuratMasuk, stats.TotalHistory)
 	} else {
 		// Admin + Kepsek + Pegawai
-		stats.TotalSuratMasuk, _ = h.smRepo.CountAll()
-		stats.TotalSuratKeluar, _ = h.skRepo.CountAll()
+		var smHistory int
+		if role == "kepsek" {
+			stats.TotalSuratMasuk, _ = h.smRepo.CountByStatus("menunggu")
+			smHistory, _ = h.smRepo.CountHistory()
+		} else {
+			// admin / pegawai (TU)
+			stats.TotalSuratMasuk, _ = h.smRepo.CountActive()
+			smHistory, _ = h.smRepo.CountHistoryForAdmin()
+		}
+
+		stats.TotalSuratKeluar, _ = h.skRepo.CountByStatus("menunggu")
 
 		smMenunggu, _ := h.smRepo.CountByStatus("menunggu")
 		skMenunggu, _ := h.skRepo.CountByStatus("menunggu")
 		stats.SuratMenungguPersetujuan = smMenunggu + skMenunggu
 
-		smHistory, _ := h.smRepo.CountHistory()
 		skHistory, _ := h.skRepo.CountHistory()
 		stats.TotalHistory = smHistory + skHistory
 
 		if role == "admin" {
 			stats.TotalUsers, _ = h.userRepo.Count()
 		}
+		log.Printf("DEBUG Stats OTHER - TotalSuratMasuk: %d, TotalSuratKeluar: %d, SuratMenungguPersetujuan: %d, TotalHistory: %d", stats.TotalSuratMasuk, stats.TotalSuratKeluar, stats.SuratMenungguPersetujuan, stats.TotalHistory)
 	}
 
 	c.JSON(http.StatusOK, models.APIResponse{Success: true, Data: stats})

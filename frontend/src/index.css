@@ -458,6 +458,33 @@ mark, .search-highlight {
 }
 .page-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); }
 
+.sticky-filter-container {
+  position: sticky;
+  top: var(--header-height);
+  background: var(--bg-primary);
+  z-index: 40;
+  padding-top: 24px;
+  padding-bottom: 16px;
+  margin-top: -24px;
+  margin-left: -24px;
+  margin-right: -24px;
+  padding-left: 24px;
+  padding-right: 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+@media (max-width: 768px) {
+  .sticky-filter-container {
+    padding-top: 16px;
+    padding-bottom: 12px;
+    margin-top: -16px;
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
 /* === CARDS === */
 .card {
   background: var(--bg-card); border: 1px solid var(--border-color);

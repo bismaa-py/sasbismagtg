@@ -11,9 +11,9 @@ const MONTHS_FULL = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Ju
  * - Timestamps with timezone (Z or +/-offset) → native parsing (UTC→local conversion)
  * - Timestamps without timezone → parse as local time
  */
-function parseBackendDate(tgl) {
+export function parseBackendDate(tgl) {
   if (!tgl) return null;
-  const str = String(tgl);
+  let str = String(tgl);
 
   // Date-only: "2026-05-12" → parse as local date (midnight local time)
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
@@ -21,13 +21,11 @@ function parseBackendDate(tgl) {
     return { date: new Date(y, m - 1, d), dateOnly: true };
   }
 
-  // If string has timezone indicator (Z or +/-offset), use native Date parsing
-  // which correctly converts UTC to local time (e.g., 02:57 UTC → 09:57 WIB)
-  if (/Z|[+-]\d{2}:\d{2}/.test(str)) {
-    return { date: new Date(str), dateOnly: false };
-  }
+  // Strip UTC timezone indicator to force local time parsing
+  // because the backend stores local time but serializes it as UTC (Z).
+  str = str.replace(/Z$/, '').replace(/[+-]00:00$/, '').replace(/[+-]0000$/, '');
 
-  // No timezone indicator: extract parts and parse as local time
+  // Extract parts and parse as local time
   const match = str.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
   if (match) {
     return { date: new Date(+match[1], +match[2]-1, +match[3], +match[4], +match[5], +match[6]), dateOnly: false };

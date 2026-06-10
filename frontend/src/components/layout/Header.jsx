@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Menu, Clock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
+import { parseBackendDate } from '../../utils/formatDate';
 
 const pageTitles = {
   '/dashboard': 'Beranda',
@@ -12,6 +13,7 @@ const pageTitles = {
   '/log-aktivitas': 'Catatan Aktivitas',
   '/profil': 'Profil',
   '/riwayat': 'Riwayat',
+  '/panduan': 'Panduan Pengguna',
 };
 
 export default function Header({ onMenuToggle }) {
@@ -101,7 +103,10 @@ export default function Header({ onMenuToggle }) {
   };
 
   const timeAgo = (date) => {
-    const parsed = new Date(date);
+    if (!date) return '-';
+    const parsedObj = parseBackendDate(date);
+    if (!parsedObj || isNaN(parsedObj.date.getTime())) return '-';
+    const parsed = parsedObj.date;
     const diff = Date.now() - parsed.getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'Baru saja';

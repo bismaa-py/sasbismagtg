@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { ArrowLeft, CheckCircle, XCircle, Send, Download, RefreshCw, Eye, BookOpen, Users, ChevronDown, User, Briefcase, Mail, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import api from '../api/axios';
-import { formatTanggal, formatTanggalShort, formatTanggalOnly, formatJabatan } from '../utils/formatDate';
+import { formatTanggal, formatTanggalShort, formatTanggalOnly, formatJabatan, parseBackendDate } from '../utils/formatDate';
+import { getUploadUrl } from '../utils/urlHelper';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
@@ -28,13 +29,9 @@ export default function SuratDetail({ type }) {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [selectedPenerima, setSelectedPenerima] = useState([]); // checkbox penerima untuk kepsek
 
-  // Daftar statis penerima untuk checkbox kepsek (sesuai database)
+  // Daftar statis penerima untuk checkbox kepsek (hanya 4 waka)
   const daftarPenerima = [
-    'waka kesiswaan', 'waka kurikulum', 'waka sarpras', 'waka humas',
-    'koordinator waka', 'koordinator bk', 'koordinator bkk',
-    'kapro rpl', 'kapro tkj', 'kapro dkv', 'kapro an',
-    'kapro ei', 'kapro mt', 'kapro av', 'kapro bc',
-    'bk', 'bkk', 'prakerin'
+    'waka kesiswaan', 'waka kurikulum', 'waka sarpras', 'waka humas'
   ];
 
   // Status auto-read oleh user (sudah dibaca otomatis saat buka)
@@ -72,12 +69,18 @@ export default function SuratDetail({ type }) {
         setLastUpdated(new Date());
         window.dispatchEvent(new Event('refreshNotifications'));
       }
-      // Admin dan pegawai perlu daftar user (untuk meneruskan surat)
-      if ((user.role === 'admin' || user.role === 'pegawai') && !silent) {
+      // Admin, pegawai, dan waka perlu daftar user (untuk meneruskan surat)
+      if ((user.role === 'admin' || user.role === 'pegawai' || user.role === 'waka') && !silent) {
         const u = await api.get('/users');
         if (u.data.success) {
           const allUsers = u.data.data || [];
-          setUsers(allUsers.filter(x => x.role === 'user'));
+          if (user.role === 'waka') {
+            // Waka: hanya tampilkan user biasa (bukan admin/kepsek/waka/pegawai)
+            setUsers(allUsers.filter(x => x.role === 'user'));
+          } else {
+            // Admin/TU: hanya tampilkan user waka
+            setUsers(allUsers.filter(x => x.role === 'waka'));
+          }
         }
       }
     } catch (e) { /* */ }
@@ -85,6 +88,17 @@ export default function SuratDetail({ type }) {
 
   // Review surat oleh kepsek (langsung di halaman, bukan modal)
   const handleReview = async () => {
+    if (!reviewForm.status) return;
+    // Validasi: catatan WAJIB diisi
+    if (!reviewForm.catatan.trim()) {
+      showToast('Catatan wajib diisi', 'error');
+      return;
+    }
+    // Validasi: checkbox penerima WAJIB dipilih saat menyetujui surat masuk
+    if (reviewForm.status === 'disetujui' && type === 'masuk' && selectedPenerima.length === 0) {
+      showToast('Pilih minimal 1 penerima (Waka) untuk meneruskan surat', 'error');
+      return;
+    }
     setReviewLoading(true);
     try {
       const endpoint = type === 'masuk' ? `/surat-masuk/${id}/review` : `/surat-keluar/${id}/review`;
@@ -116,10 +130,11 @@ export default function SuratDetail({ type }) {
     if (forwardTo.length === 0) { showToast('Pilih minimal 1 penerima', 'error'); return; }
     setForwardLoading(true);
     try {
-      await api.put(`/surat-masuk/${id}/teruskan`, { targets: forwardTo });
+      await api.put(`/surat-masuk/${id}/teruskan`, { diteruskan_ke: forwardTo });
       setShowForward(false);
+      setForwardTo([]);
       fetchDetail();
-      showToast('Surat berhasil diteruskan', 'success');
+      showToast('Surat berhasil diteruskan ke Waka', 'success');
     } catch (err) {
       showToast(err.response?.data?.message || 'Gagal meneruskan', 'error');
     } finally {
@@ -127,7 +142,41 @@ export default function SuratDetail({ type }) {
     }
   };
 
+  // === WAKA: Forward surat ke user personal ===
+  const [showWakaForward, setShowWakaForward] = useState(false);
+  const [selectedWakaUsers, setSelectedWakaUsers] = useState([]);
+  const [catatanWaka, setCatatanWaka] = useState('');
+  const [wakaForwardLoading, setWakaForwardLoading] = useState(false);
 
+  const toggleWakaUser = (uid) => {
+    setSelectedWakaUsers(prev => prev.includes(uid) ? prev.filter(u => u !== uid) : [...prev, uid]);
+  };
+
+  const handleForwardWaka = async () => {
+    if (selectedWakaUsers.length === 0) { showToast('Pilih minimal 1 penerima', 'error'); return; }
+    if (!catatanWaka.trim()) { showToast('Catatan wajib diisi', 'error'); return; }
+    setWakaForwardLoading(true);
+    try {
+      await api.put(`/surat-masuk/${id}/teruskan-waka`, {
+        diteruskan_ke: selectedWakaUsers,
+        catatan_waka: catatanWaka
+      });
+      setShowWakaForward(false);
+      setSelectedWakaUsers([]);
+      setCatatanWaka('');
+      fetchDetail();
+      showToast('Surat berhasil diteruskan ke pengguna', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Gagal meneruskan', 'error');
+    } finally {
+      setWakaForwardLoading(false);
+    }
+  };
+
+  // Toggle forward user selection (simple checkbox)
+  const toggleForwardUser = (uid) => {
+    setForwardTo(prev => prev.includes(uid) ? prev.filter(u => u !== uid) : [...prev, uid]);
+  };
 
   // Grup user berdasarkan jabatan untuk modal teruskan
   const jabatanGroups = useMemo(() => {
@@ -164,8 +213,10 @@ export default function SuratDetail({ type }) {
 
   const formatTimeAgo = (date) => {
     if (!date) return '';
+    const parsedObj = parseBackendDate(date);
+    if (!parsedObj || isNaN(parsedObj.date.getTime())) return '';
     const now = new Date();
-    const diff = now - new Date(date);
+    const diff = now - parsedObj.date;
     const seconds = Math.floor(diff / 1000);
     if (seconds < 60) return 'Baru saja';
     const minutes = Math.floor(seconds / 60);
@@ -677,14 +728,128 @@ export default function SuratDetail({ type }) {
 
       {/* Tombol Aksi Admin/Pegawai */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-        {/* Admin/Pegawai: teruskan surat yang disetujui ke user */}
+        {/* Admin/Pegawai: teruskan surat yang disetujui ke WAKA */}
         {(user.role === 'admin' || user.role === 'pegawai') && type === 'masuk' && currentStatus === 'disetujui' && (!surat.status_alur || surat.status_alur === 'disposisi_kepsek') && (
-          <button className="btn btn-primary" onClick={() => setShowForward(true)}><Send size={16} /> Teruskan ke Pengguna</button>
+          <button className="btn btn-primary" onClick={() => setShowForward(true)}><Send size={16} /> Teruskan ke Waka</button>
+        )}
+        {/* Waka: teruskan surat ke user personal - cek dari disposisi array */}
+        {user.role === 'waka' && type === 'masuk' && disposisi.some(d => d.id_penerima === user.id && d.status_disposisi !== 'dibaca') && (
+          <button className="btn btn-primary" onClick={() => setShowWakaForward(true)}><Send size={16} /> Teruskan ke Pengguna</button>
         )}
       </div>
 
-      {/* Daftar disposisi untuk surat masuk */}
-      {type === 'masuk' && disposisi.length > 0 && (
+      {/* Modal Waka Forward ke User */}
+      {showWakaForward && (
+        <div className="modal-overlay" onClick={() => setShowWakaForward(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div style={{
+              background: '#0f2b52', padding: '20px 24px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10,
+                  background: 'rgba(255,255,255,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <Send size={20} color="white" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>Teruskan ke Pengguna</h2>
+                  <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>Pilih pengguna yang akan menerima surat</p>
+                </div>
+              </div>
+              <button onClick={() => setShowWakaForward(false)} style={{
+                background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8,
+                width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+              }}>
+                <XCircle size={18} color="white" />
+              </button>
+            </div>
+            <div style={{ padding: '20px 24px', maxHeight: '50vh', overflowY: 'auto' }}>
+              {users.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <Users size={40} style={{ color: 'var(--text-muted)', marginBottom: 8 }} />
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Tidak ada pengguna tersedia</p>
+                </div>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 12 }}>
+                    Centang pengguna yang akan menerima surat ini:
+                  </p>
+                  <div style={{
+                    border: '1.5px solid var(--border-color)', borderRadius: 'var(--radius)',
+                    padding: '12px', maxHeight: 220, overflowY: 'auto',
+                    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8,
+                    background: '#f8fafc'
+                  }}>
+                    {users.map(u => {
+                      const isSelected = selectedWakaUsers.includes(u.id);
+                      return (
+                        <label key={u.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '10px 12px', cursor: 'pointer', fontSize: '0.82rem', borderRadius: 8,
+                          border: isSelected ? '1.5px solid #059669' : '1px solid var(--border-color)',
+                          background: isSelected ? 'rgba(5, 150, 105, 0.05)' : '#ffffff',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleWakaUser(u.id)}
+                            style={{ width: 16, height: 16, accentColor: '#059669', cursor: 'pointer' }} />
+                          <div>
+                            <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{u.nama}</span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {selectedWakaUsers.length > 0 && (
+                    <p style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600, marginTop: 6 }}>
+                      ✓ {selectedWakaUsers.length} penerima dipilih
+                    </p>
+                  )}
+                  <div style={{ marginTop: 16 }}>
+                    <label style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: 6, display: 'block' }}>
+                      Catatan untuk penerima
+                    </label>
+                    <textarea
+                      value={catatanWaka} onChange={e => setCatatanWaka(e.target.value)}
+                      placeholder="Tambahkan catatan atau instruksi untuk penerima..."
+                      rows={3}
+                      style={{
+                        width: '100%', padding: '12px 14px', borderRadius: 8, fontSize: '0.88rem',
+                        border: '1.5px solid var(--border-color)', outline: 'none',
+                        background: '#ffffff', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit'
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div style={{
+              padding: '16px 24px', borderTop: '1px solid var(--border-color)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)'
+            }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                {selectedWakaUsers.length > 0 ? (
+                  <span style={{ color: '#2563eb', fontWeight: 600 }}>{selectedWakaUsers.length} penerima dipilih</span>
+                ) : 'Belum ada yang dipilih'}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost" onClick={() => setShowWakaForward(false)} disabled={wakaForwardLoading}>Batal</button>
+                <button className="btn btn-primary" onClick={handleForwardWaka}
+                  disabled={selectedWakaUsers.length === 0 || wakaForwardLoading}
+                  style={{ background: (selectedWakaUsers.length > 0 && !wakaForwardLoading) ? '#0f2b52' : undefined, display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Send size={16} /> {wakaForwardLoading ? 'Meneruskan...' : `Teruskan (${selectedWakaUsers.length})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Daftar disposisi untuk surat masuk - HANYA ADMIN yang bisa lihat */}
+      {type === 'masuk' && disposisi.length > 0 && (user.role === 'admin' || user.role === 'pegawai') && (
         <div className="card">
           <h3 style={{ marginBottom: 12, fontSize: '1rem' }}>Disposisi</h3>
           <div className="table-container">
@@ -727,156 +892,96 @@ export default function SuratDetail({ type }) {
       )}
 
 
-      {/* Modal Teruskan - KHUSUS ADMIN - Grouped by Jabatan */}
+      {/* Modal Teruskan ke Waka - KHUSUS ADMIN - Simple Checkbox */}
       {showForward && (
         <div className="modal-overlay" onClick={() => setShowForward(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
-            {/* Header - matching sidebar navy */}
             <div style={{
-              background: '#0f2b52',
-              padding: '20px 24px',
+              background: '#0f2b52', padding: '20px 24px',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: 10,
-                  background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)',
+                  background: 'rgba(255,255,255,0.2)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
                   <Send size={20} color="white" />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>Teruskan Surat</h2>
-                  <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>Pilih penerima berdasarkan jabatan</p>
+                  <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>Teruskan ke Waka</h2>
+                  <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>Pilih Waka yang akan menerima surat</p>
                 </div>
               </div>
               <button onClick={() => setShowForward(false)} style={{
                 background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8,
-                width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', transition: 'background 0.15s'
+                width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
               }}>
                 <XCircle size={18} color="white" />
               </button>
             </div>
-
-            {/* Body */}
             <div style={{ padding: '20px 24px', maxHeight: '55vh', overflowY: 'auto' }}>
-              {jabatanGroups.length === 0 ? (
+              {users.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '32px 0' }}>
                   <Users size={40} style={{ color: 'var(--text-muted)', marginBottom: 8 }} />
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Tidak ada jabatan tersedia</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Tidak ada Waka tersedia</p>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {jabatanGroups.map(group => {
-                    const selectedUserId = getSelectedUserForJabatan(group.id);
-                    const isSelected = selectedUserId !== '';
-                    return (
-                      <div key={group.id} style={{
-                        borderRadius: 12,
-                        border: isSelected ? '2px solid #3b82f6' : '1px solid var(--border-color)',
-                        background: isSelected ? '#eff6ff' : 'var(--bg-primary)',
-                        overflow: 'hidden',
-                        transition: 'all 0.2s ease',
-                        boxShadow: isSelected ? '0 2px 8px rgba(59, 130, 246, 0.12)' : '0 1px 3px rgba(0,0,0,0.04)'
-                      }}>
-                        {/* Jabatan header */}
-                        <div style={{
-                          padding: '12px 16px',
+                <>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 12 }}>
+                    Centang Waka yang akan menerima surat ini:
+                  </p>
+                  <div style={{
+                    border: '1.5px solid var(--border-color)', borderRadius: 'var(--radius)',
+                    padding: '12px', display: 'flex', flexDirection: 'column', gap: 8,
+                    background: '#f8fafc'
+                  }}>
+                    {users.map(u => {
+                      const isSelected = forwardTo.includes(u.id);
+                      return (
+                        <label key={u.id} style={{
                           display: 'flex', alignItems: 'center', gap: 10,
-                          borderBottom: '1px solid ' + (isSelected ? 'rgba(59, 130, 246, 0.15)' : 'var(--border-color)')
+                          padding: '10px 12px', cursor: 'pointer', fontSize: '0.85rem', borderRadius: 8,
+                          border: isSelected ? '1.5px solid #2563eb' : '1px solid var(--border-color)',
+                          background: isSelected ? 'rgba(37, 99, 235, 0.05)' : '#ffffff',
+                          transition: 'all 0.2s ease'
                         }}>
-                          <div style={{
-                            width: 36, height: 36, borderRadius: 8,
-                            background: isSelected ? '#2563eb' : '#6b7280',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            flexShrink: 0, transition: 'all 0.2s ease'
-                          }}>
-                            <Briefcase size={18} color="white" />
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleForwardUser(u.id)}
+                            style={{ width: 16, height: 16, accentColor: '#2563eb', cursor: 'pointer' }} />
+                          <div>
+                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{u.nama}</span>
+                            {u.nama_jabatan && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: 8 }}>
+                                {formatJabatan(u.nama_jabatan)}
+                              </span>
+                            )}
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <p style={{
-                              fontSize: '0.88rem', fontWeight: 600,
-                              color: isSelected ? '#1e40af' : 'var(--text-primary)',
-                              transition: 'color 0.2s'
-                            }}>
-                              {formatJabatan(group.nama)}
-                            </p>
-                            <p style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: 1 }}>
-                              {group.users.length} pengguna terdaftar
-                            </p>
-                          </div>
-                          {isSelected && (
-                            <div style={{
-                              width: 22, height: 22, borderRadius: '50%',
-                              background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}>
-                              <CheckCircle size={14} color="white" />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* User dropdown */}
-                        <div style={{ padding: '12px 16px' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
-                            Pilih Pengguna
-                          </label>
-                          <div style={{ position: 'relative' }}>
-                            <select
-                              value={selectedUserId}
-                              onChange={e => handleSelectUserForJabatan(group.id, e.target.value)}
-                              style={{
-                                width: '100%', padding: '10px 36px 10px 14px',
-                                borderRadius: 8, fontSize: '0.85rem',
-                                border: '1px solid ' + (isSelected ? '#93c5fd' : 'var(--border-color)'),
-                                background: isSelected ? '#ffffff' : 'var(--bg-secondary)',
-                                color: 'var(--text-primary)',
-                                cursor: 'pointer', outline: 'none',
-                                appearance: 'none', WebkitAppearance: 'none',
-                                transition: 'all 0.15s ease',
-                                fontWeight: isSelected ? 500 : 400
-                              }}
-                            >
-                              <option value="">— Pilih pengguna —</option>
-                              {group.users.map(u => (
-                                <option key={u.id} value={u.id}>{u.nama}</option>
-                              ))}
-                            </select>
-                            <ChevronDown size={16} style={{
-                              position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                              color: 'var(--text-muted)', pointerEvents: 'none'
-                            }} />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {forwardTo.length > 0 && (
+                    <p style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600, marginTop: 6 }}>
+                      ✓ {forwardTo.length} Waka dipilih
+                    </p>
+                  )}
+                </>
               )}
             </div>
-
-            {/* Footer */}
             <div style={{
-              padding: '16px 24px',
-              borderTop: '1px solid var(--border-color)',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              background: 'var(--bg-secondary)'
+              padding: '16px 24px', borderTop: '1px solid var(--border-color)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)'
             }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 {forwardTo.length > 0 ? (
-                  <span style={{ color: '#2563eb', fontWeight: 600 }}>{forwardTo.length} jabatan dipilih</span>
+                  <span style={{ color: '#2563eb', fontWeight: 600 }}>{forwardTo.length} Waka dipilih</span>
                 ) : 'Belum ada yang dipilih'}
               </span>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-ghost" onClick={() => setShowForward(false)} disabled={forwardLoading}>Batal</button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleForward}
+                <button className="btn btn-primary" onClick={handleForward}
                   disabled={forwardTo.length === 0 || forwardLoading}
-                  style={{
-                    background: (forwardTo.length > 0 && !forwardLoading) ? '#0f2b52' : undefined,
-                    display: 'flex', alignItems: 'center', gap: 6
-                  }}
+                  style={{ background: (forwardTo.length > 0 && !forwardLoading) ? '#0f2b52' : undefined, display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   <Send size={16} /> {forwardLoading ? 'Meneruskan...' : `Teruskan (${forwardTo.length})`}
                 </button>
@@ -920,7 +1025,7 @@ export default function SuratDetail({ type }) {
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <a
-                  href={`http://localhost:8080/uploads/${surat.file_pdf}`}
+                  href={getUploadUrl(surat.file_pdf)}
                   download
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -979,7 +1084,7 @@ export default function SuratDetail({ type }) {
                   padding: '24px'
                 }}>
                   <img
-                    src={`http://localhost:8080/uploads/${surat.file_pdf}`}
+                    src={getUploadUrl(surat.file_pdf)}
                     alt="Lampiran"
                     style={{
                       maxWidth: '100%', height: 'auto', display: 'block',
@@ -1013,11 +1118,14 @@ function PdfViewer({ file, filename }) {
         if (!active) return;
 
         // Dynamically resolve backend root URL from Axios baseURL configuration
-        const rootURL = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/api$/, '') : 'http://localhost:8080';
-        const fileURL = `${rootURL}/uploads/${file}`;
+        const fileURL = getUploadUrl(file);
 
-        // Fetch using the configured Axios API client to seamlessly handle CORS and authorization headers
-        const response = await api.get(fileURL, { responseType: 'arraybuffer' });
+        // Ambil token dari localStorage untuk header Authorization
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        // Fetch menggunakan URL lengkap dengan axios biasa (bukan api instance agar tidak double baseURL)
+        const response = await import('axios').then(m => m.default.get(fileURL, { responseType: 'arraybuffer', headers }));
         if (!active) return;
 
         const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(response.data) });
@@ -1121,8 +1229,8 @@ function PdfViewer({ file, filename }) {
 
       {/* Pages Container */}
       <div style={{
-        flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', gap: 24, background: '#cbd5e1'
+        flex: 1, overflow: 'auto', padding: 24, display: 'flex', flexDirection: 'column',
+        gap: 24, background: '#cbd5e1'
       }}>
         {pages.pageNumbers.map(pageNum => (
           <PdfPage key={pageNum} pdf={pages.pdf} pageNum={pageNum} zoom={zoom} />
@@ -1135,6 +1243,7 @@ function PdfViewer({ file, filename }) {
 function PdfPage({ pdf, pageNum, zoom }) {
   const canvasRef = useRef(null);
   const [rendering, setRendering] = useState(true);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     let active = true;
@@ -1152,12 +1261,24 @@ function PdfPage({ pdf, pageNum, zoom }) {
         const context = canvas.getContext('2d');
         const originalViewport = page.getViewport({ scale: 1.0 });
 
-        const targetWidth = 780;
-        const scale = (targetWidth / originalViewport.width) * zoom;
+        // Get the parent of the wrapper div, which is the scrolling pages container!
+        // Grandparent of canvas: canvas.parentElement.parentElement
+        const grandparent = canvas.parentElement ? canvas.parentElement.parentElement : null;
+        const containerWidth = grandparent ? grandparent.clientWidth - 48 : 780; // 48px padding (24px left + 24px right)
+        
+        // Base width fits the container (capped at a nice width like 800px)
+        const baseWidth = Math.min(800, containerWidth > 0 ? containerWidth : 780);
+        const displayWidth = baseWidth * zoom;
+        const displayHeight = (originalViewport.height / originalViewport.width) * displayWidth;
+
+        // Set canvas internal resolution higher (e.g. 1.5x of display size) for crisp rendering
+        const scale = (displayWidth / originalViewport.width) * 1.5; 
         const viewport = page.getViewport({ scale });
 
-        canvas.height = viewport.height;
         canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        setDimensions({ width: displayWidth, height: displayHeight });
 
         const renderContext = {
           canvasContext: context,
@@ -1187,16 +1308,19 @@ function PdfPage({ pdf, pageNum, zoom }) {
   return (
     <div style={{
       position: 'relative',
+      width: dimensions.width ? `${dimensions.width}px` : 'auto',
+      height: dimensions.height ? `${dimensions.height}px` : 'auto',
       boxShadow: '0 8px 30px rgba(0,0,0,0.18)',
       borderRadius: 12,
       overflow: 'hidden',
       background: '#ffffff',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      border: '1px solid rgba(0,0,0,0.06)'
+      border: '1px solid rgba(0,0,0,0.06)',
+      transition: 'width 0.2s ease, height 0.2s ease',
+      marginLeft: 'auto',
+      marginRight: 'auto',
+      flexShrink: 0
     }}>
-      <canvas ref={canvasRef} style={{ display: 'block', maxWidth: '100%', height: 'auto' }} />
+      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
       {rendering && (
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,

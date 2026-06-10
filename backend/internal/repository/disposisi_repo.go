@@ -13,10 +13,11 @@ func NewDisposisiRepository(db *sql.DB) *DisposisiRepository {
 
 func (r *DisposisiRepository) Create(d *models.Disposisi) error {
 	return r.db.QueryRow(
-		`INSERT INTO disposisi (isi_disposisi, batas_waktu, proses_lanjut, koordinasi_konfirmasi, id_surat_masuk, id_kepsek, id_penerima, id_jabatan_penerima)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id_disposisi, tanggal_disposisi`,
+		`INSERT INTO disposisi (isi_disposisi, batas_waktu, proses_lanjut, koordinasi_konfirmasi, id_surat_masuk, id_kepsek, id_penerima, id_jabatan_penerima, id_waka, catatan_waka)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id_disposisi, tanggal_disposisi`,
 		d.IsiDisposisi, d.BatasWaktu, d.ProsesLanjut, d.KoordinasiKonfirmasi,
 		d.IDSuratMasuk, d.IDKepsek, d.IDPenerima, d.IDJabatanPenerima,
+		d.IDWaka, d.CatatanWaka,
 	).Scan(&d.ID, &d.TanggalDisposisi)
 }
 
@@ -125,4 +126,45 @@ func (r *DisposisiRepository) CountUnconfirmedByUser(userID int) (int, error) {
 	var c int
 	err := r.db.QueryRow("SELECT COUNT(*) FROM disposisi WHERE id_penerima=$1 AND status_disposisi='belum_dibaca'", userID).Scan(&c)
 	return c, err
+}
+
+// FindByWakaUserID: find disposisi where waka is the recipient (for waka inbox)
+func (r *DisposisiRepository) FindByWakaUserID(wakaID int) ([]models.DisposisiDetail, error) {
+	rows, err := r.db.Query(
+		`SELECT d.id_disposisi, '' AS sifat, COALESCE(d.isi_disposisi,''), COALESCE(d.batas_waktu,''),
+		        COALESCE(d.proses_lanjut,''), COALESCE(d.koordinasi_konfirmasi,''),
+		        d.id_surat_masuk, d.id_kepsek, d.id_penerima, d.tanggal_disposisi,
+		        COALESCE(d.status_disposisi,'belum_dibaca'), COALESCE(d.status_approval,'menunggu'), d.approval_at,
+		        COALESCE(uk.nama,''), COALESCE(up.nama,''),
+		        sm.no_surat, sm.perihal_surat, sm.asal_surat, COALESCE(sm.file_pdf,'')
+		 FROM disposisi d
+		 JOIN surat_masuk sm ON d.id_surat_masuk = sm.id_surat_masuk
+		 LEFT JOIN users uk ON d.id_kepsek = uk.id_user
+		 LEFT JOIN users up ON d.id_penerima = up.id_user
+		 WHERE d.id_penerima = $1 AND d.id_waka IS NULL
+		 ORDER BY d.tanggal_disposisi DESC`, wakaID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []models.DisposisiDetail
+	for rows.Next() {
+		var dd models.DisposisiDetail
+		var approvalAt sql.NullTime
+		if err := rows.Scan(
+			&dd.ID, &dd.Sifat, &dd.IsiDisposisi, &dd.BatasWaktu,
+			&dd.ProsesLanjut, &dd.KoordinasiKonfirmasi,
+			&dd.IDSuratMasuk, &dd.IDKepsek, &dd.IDPenerima, &dd.TanggalDisposisi,
+			&dd.StatusDisposisi, &dd.StatusApproval, &approvalAt,
+			&dd.NamaKepsek, &dd.NamaPenerima,
+			&dd.NoSurat, &dd.PerihalSurat, &dd.AsalSurat, &dd.FilePDF,
+		); err != nil {
+			return nil, err
+		}
+		if approvalAt.Valid {
+			dd.ApprovalAt = &approvalAt.Time
+		}
+		list = append(list, dd)
+	}
+	return list, nil
 }

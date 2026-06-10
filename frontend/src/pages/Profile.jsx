@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Camera, Send, ShieldCheck, ZoomIn, ZoomOut, Move, Trash2 } from 'lucide-react';
+import { Lock, Camera, Send, ShieldCheck, ZoomIn, ZoomOut, Move, Trash2, Mail, Briefcase, Shield, Calendar, User, KeyRound, Info, CheckCircle } from 'lucide-react';
 import api from '../api/axios';
 import { formatTanggalOnly, formatJabatan } from '../utils/formatDate';
+import { getUploadUrl } from '../utils/urlHelper';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
@@ -33,8 +34,6 @@ export default function Profile() {
   const [otpSending, setOtpSending] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(0);
   const [pwForm, setPwForm] = useState({ new_password: '', confirm_password: '' });
-
-
 
   // Pilih foto - buka modal crop
   const handlePhotoSelect = (e) => {
@@ -80,6 +79,12 @@ export default function Profile() {
     ctx.lineWidth = 2;
     ctx.stroke();
   }, [cropScale, cropOffset]);
+
+  useEffect(() => {
+    if (showCropModal && cropImage) {
+      drawCropPreview();
+    }
+  }, [showCropModal, cropImage, drawCropPreview, cropScale, cropOffset]);
 
   const handleCropMouseDown = (e) => {
     setIsDragging(true);
@@ -183,177 +188,531 @@ export default function Profile() {
     } catch (err) { setError(err.response?.data?.message || 'Gagal mengubah kata sandi'); }
   };
 
-  const roleLabel = { admin: 'Admin / Tata Usaha', pegawai: 'Pegawai TU', kepsek: 'Kepala Sekolah', user: 'Pengguna' };
+  const roleLabel = { admin: 'Admin / Tata Usaha', pegawai: 'Pegawai TU', kepsek: 'Kepala Sekolah', user: 'Pengguna', waka: 'Wakil Kepala Sekolah' };
+  const roleBadgeColor = {
+    admin: { bg: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', border: 'rgba(59, 130, 246, 0.25)' },
+    pegawai: { bg: 'rgba(16, 185, 129, 0.12)', color: '#059669', border: 'rgba(16, 185, 129, 0.25)' },
+    kepsek: { bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706', border: 'rgba(245, 158, 11, 0.25)' },
+    user: { bg: 'rgba(107, 114, 128, 0.12)', color: '#4b5563', border: 'rgba(107, 114, 128, 0.25)' },
+    waka: { bg: 'rgba(139, 92, 246, 0.12)', color: '#7c3aed', border: 'rgba(139, 92, 246, 0.25)' },
+  };
   const allJabatan = user?.semua_jabatan || [];
+  const currentRoleColor = roleBadgeColor[user?.role] || roleBadgeColor.user;
 
   return (
     <div className="page">
 
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="profile-card">
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <div className="profile-avatar" onClick={() => user?.foto_profil ? setShowPhotoPreview(true) : fileRef.current?.click()} style={{ cursor: 'pointer' }}>
+      {/* ═══ PREMIUM HERO HEADER ═══ */}
+      <div style={{
+        borderRadius: 16, overflow: 'hidden', marginBottom: 24,
+        boxShadow: '0 4px 24px rgba(15, 43, 82, 0.12), 0 1px 3px rgba(0,0,0,0.06)'
+      }}>
+        {/* Top gradient banner */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f2b52 0%, #1a3f6f 40%, #2563eb 100%)',
+          height: 140, position: 'relative',
+          backgroundImage: `linear-gradient(135deg, #0f2b52 0%, #1a3f6f 40%, #2563eb 100%), 
+            radial-gradient(circle at 20% 50%, rgba(255,255,255,0.05) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255,255,255,0.08) 0%, transparent 40%)`
+        }}>
+          {/* Decorative dots */}
+          <div style={{
+            position: 'absolute', right: 24, top: 24,
+            display: 'grid', gridTemplateColumns: 'repeat(6, 8px)', gap: 8, opacity: 0.15
+          }}>
+            {Array.from({ length: 18 }).map((_, i) => (
+              <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: '#fff' }} />
+            ))}
+          </div>
+        </div>
+
+        {/* Profile info section */}
+        <div style={{
+          background: 'var(--bg-primary)', padding: '0 32px 28px',
+          position: 'relative'
+        }}>
+          {/* Avatar - overlapping banner */}
+          <div style={{
+            position: 'relative', width: 'fit-content',
+            marginTop: -52
+          }}>
+            <div
+              onClick={() => user?.foto_profil ? setShowPhotoPreview(true) : fileRef.current?.click()}
+              style={{
+                width: 104, height: 104, borderRadius: '50%',
+                border: '4px solid var(--bg-primary)',
+                background: 'linear-gradient(135deg, #1a3f6f, #2563eb)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '2.2rem', fontWeight: 700, color: '#ffffff',
+                cursor: 'pointer', overflow: 'hidden',
+                boxShadow: '0 4px 16px rgba(15, 43, 82, 0.2)',
+                transition: 'transform 0.2s ease'
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
               {user?.foto_profil ? (
-                <img src={`http://localhost:8080/uploads/${user.foto_profil}`} alt="Foto Profil" />
+                <img src={getUploadUrl(user?.foto_profil)} alt="Foto Profil"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 user?.nama?.charAt(0).toUpperCase()
               )}
             </div>
+            {/* Camera button */}
             <div
               onClick={() => fileRef.current?.click()}
               style={{
-                position: 'absolute', bottom: -2, right: -2,
-                width: 30, height: 30, borderRadius: '50%',
-                background: 'var(--accent)', display: 'flex',
+                position: 'absolute', bottom: 2, right: 2,
+                width: 32, height: 32, borderRadius: '50%',
+                background: '#2563eb', display: 'flex',
                 alignItems: 'center', justifyContent: 'center',
-                border: '3px solid var(--bg-secondary)',
+                border: '3px solid var(--bg-primary)',
                 cursor: 'pointer', zIndex: 2,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                transition: 'transform 0.15s ease'
+                boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)',
+                transition: 'all 0.2s ease'
               }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
-              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.15)'; e.currentTarget.style.background = '#1d4ed8'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#2563eb'; }}
             >
               <Camera size={14} color="white" />
             </div>
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoSelect} />
           </div>
-          <div>
-            <h2>{user?.nama}</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{user?.email}</p>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-              {allJabatan.length > 0 ? (
-                allJabatan.map((j, i) => (
-                  <span key={i} style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: '0.78rem', fontWeight: 500, background: '#e5e7eb', color: '#374151' }}>{formatJabatan(j.nama_jabatan)}</span>
-                ))
-              ) : (
-                <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: '0.78rem', fontWeight: 500, background: '#e5e7eb', color: '#374151' }}>{formatJabatan(user?.nama_jabatan) || roleLabel[user?.role]}</span>
+
+          {/* Name & info row */}
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h2 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
+                {user?.nama}
+              </h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Mail size={14} style={{ opacity: 0.6 }} />
+                {user?.email}
+              </p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, alignItems: 'center' }}>
+                {/* Role badge */}
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', borderRadius: 20,
+                  fontSize: '0.76rem', fontWeight: 600,
+                  background: currentRoleColor.bg, color: currentRoleColor.color,
+                  border: `1px solid ${currentRoleColor.border}`
+                }}>
+                  <Shield size={12} />
+                  {roleLabel[user?.role] || user?.role}
+                </span>
+                {/* Jabatan badges */}
+                {allJabatan.length > 0 && allJabatan.map((j, i) => (
+                  <span key={i} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '5px 12px', borderRadius: 20,
+                    fontSize: '0.76rem', fontWeight: 500,
+                    background: 'rgba(15, 43, 82, 0.06)', color: '#374151',
+                    border: '1px solid rgba(15, 43, 82, 0.1)'
+                  }}>
+                    <Briefcase size={11} />
+                    {formatJabatan(j.nama_jabatan)}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Right side: account meta & delete photo */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+              <span style={{
+                fontSize: '0.75rem', color: 'var(--text-muted)',
+                display: 'flex', alignItems: 'center', gap: 5,
+                background: 'var(--bg-secondary)', padding: '5px 12px', borderRadius: 8
+              }}>
+                <Calendar size={12} />
+                Bergabung {formatTanggalOnly(user?.created_at)}
+              </span>
+              {user?.foto_profil && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowDeletePhotoModal(true); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    fontSize: '0.75rem', color: '#ef4444', background: 'none',
+                    border: 'none', cursor: 'pointer', padding: '4px 8px',
+                    borderRadius: 6, fontFamily: 'inherit',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+                >
+                  <Trash2 size={13} /> Hapus Foto
+                </button>
               )}
             </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: 6 }}>
-              Akun dibuat: {formatTanggalOnly(user?.created_at)}
-            </p>
-            {/* Tombol hapus foto - semua role bisa hapus */}
-            {user?.foto_profil && (
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={(e) => { e.stopPropagation(); setShowDeletePhotoModal(true); }}
-                style={{ marginTop: 8, color: 'var(--danger)', fontSize: '0.8rem' }}
-              >
-                <Trash2 size={14} /> Hapus Foto Profil
-              </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ TOAST MESSAGES ═══ */}
+      {msg && (
+        <div style={{
+          background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)', border: '1px solid #a7f3d0',
+          borderRadius: 12, padding: '12px 16px', marginBottom: 20,
+          color: '#059669', fontSize: '0.85rem', fontWeight: 500,
+          display: 'flex', alignItems: 'center', gap: 8,
+          boxShadow: '0 2px 8px rgba(5, 150, 105, 0.08)'
+        }}>
+          <CheckCircle size={16} /> {msg}
+        </div>
+      )}
+      {error && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fef2f2, #fee2e2)', border: '1px solid #fecaca',
+          borderRadius: 12, padding: '12px 16px', marginBottom: 20,
+          color: '#dc2626', fontSize: '0.85rem', fontWeight: 500,
+          display: 'flex', alignItems: 'center', gap: 8,
+          boxShadow: '0 2px 8px rgba(220, 38, 38, 0.08)'
+        }}>
+          <Info size={16} /> {error}
+        </div>
+      )}
+
+      {/* ═══ TAB NAVIGATION ═══ */}
+      <div style={{
+        display: 'flex', gap: 12, marginBottom: 24
+      }}>
+        {[
+          { key: 'profil', icon: <User size={16} />, label: 'Informasi Profil' },
+          { key: 'password', icon: <KeyRound size={16} />, label: 'Keamanan Akun' }
+        ].map(t => {
+          const isActive = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => { setTab(t.key); setMsg(''); setError(''); if (t.key === 'password') setOtpStep(1); }}
+              onMouseEnter={e => {
+                if (!isActive) {
+                  e.currentTarget.style.background = 'rgba(37, 99, 235, 0.06)';
+                  e.currentTarget.style.borderColor = '#2563eb';
+                  e.currentTarget.style.color = '#2563eb';
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isActive) {
+                  e.currentTarget.style.background = 'var(--bg-primary)';
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '12px 24px', borderRadius: 12,
+                fontSize: '0.88rem', fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit',
+                transition: 'all 0.2s ease',
+                border: '1px solid',
+                borderColor: isActive ? '#0f2b52' : 'var(--border-color)',
+                background: isActive ? 'linear-gradient(135deg, #0f2b52 0%, #1a3f6f 100%)' : 'var(--bg-primary)',
+                color: isActive ? '#ffffff' : 'var(--text-secondary)',
+                boxShadow: isActive 
+                  ? '0 4px 12px rgba(15, 43, 82, 0.2)' 
+                  : '0 1px 3px rgba(0, 0, 0, 0.02)',
+              }}
+            >
+              {t.icon} {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ═══ INFORMASI PROFIL TAB ═══ */}
+      {tab === 'profil' && (
+        <div style={{
+          borderRadius: 16, border: '1px solid var(--border-color)',
+          background: 'var(--bg-primary)', overflow: 'hidden',
+          boxShadow: '0 1px 8px rgba(0,0,0,0.04)'
+        }}>
+          {/* Section header */}
+          <div style={{
+            padding: '18px 24px', borderBottom: '1px solid var(--border-color)',
+            display: 'flex', alignItems: 'center', gap: 10
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: 'rgba(15, 43, 82, 0.06)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#0f2b52'
+            }}>
+              <User size={18} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Detail Profil</h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Informasi akun dan identitas Anda</p>
+            </div>
+          </div>
+
+          {/* Info grid */}
+          <div style={{ padding: '20px 24px' }}>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 0
+            }}>
+              {[
+                { icon: <User size={16} />, label: 'Nama Lengkap', value: user?.nama },
+                { icon: <Mail size={16} />, label: 'Alamat Email', value: user?.email },
+                {
+                  icon: <Briefcase size={16} />, label: 'Jabatan',
+                  value: allJabatan.length > 0
+                    ? allJabatan.map(j => formatJabatan(j.nama_jabatan)).join(', ')
+                    : (formatJabatan(user?.nama_jabatan) || roleLabel[user?.role])
+                },
+                { icon: <Shield size={16} />, label: 'Peran Sistem', value: roleLabel[user?.role] || user?.role },
+              ].map((item, idx) => (
+                <div key={idx} style={{
+                  padding: '16px 0',
+                  borderBottom: idx < 2 ? '1px solid var(--border-color)' : 'none',
+                  display: 'flex', alignItems: 'flex-start', gap: 12
+                }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+                    background: 'rgba(37, 99, 235, 0.06)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#2563eb', marginTop: 2
+                  }}>
+                    {item.icon}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '0.73rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {item.label}
+                    </p>
+                    <p style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                      {item.value}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer note */}
+          <div style={{
+            padding: '14px 24px', borderTop: '1px solid var(--border-color)',
+            background: 'var(--bg-secondary)',
+            display: 'flex', alignItems: 'center', gap: 8,
+            color: 'var(--text-muted)', fontSize: '0.78rem'
+          }}>
+            <Info size={14} />
+            Untuk mengubah nama, email, atau jabatan, silakan hubungi Administrator.
+          </div>
+        </div>
+      )}
+
+      {/* ═══ KEAMANAN AKUN TAB ═══ */}
+      {tab === 'password' && (
+        <div style={{
+          borderRadius: 16, border: '1px solid var(--border-color)',
+          background: 'var(--bg-primary)', overflow: 'hidden',
+          boxShadow: '0 1px 8px rgba(0,0,0,0.04)'
+        }}>
+          {/* Section header */}
+          <div style={{
+            padding: '18px 24px', borderBottom: '1px solid var(--border-color)',
+            display: 'flex', alignItems: 'center', gap: 10
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: 'rgba(15, 43, 82, 0.06)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#0f2b52'
+            }}>
+              <KeyRound size={18} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Ganti Kata Sandi</h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Perbarui kata sandi untuk keamanan akun</p>
+            </div>
+          </div>
+
+          <div style={{ padding: '28px 24px' }}>
+            {otpStep === 1 && (
+              <div style={{ textAlign: 'center', maxWidth: 400, margin: '0 auto', padding: '16px 0' }}>
+                <div style={{
+                  width: 72, height: 72, borderRadius: 20,
+                  background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(37, 99, 235, 0.15))',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 20px', color: '#2563eb'
+                }}>
+                  <ShieldCheck size={36} />
+                </div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 8, color: 'var(--text-primary)' }}>
+                  Verifikasi Identitas
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: 28, lineHeight: 1.6 }}>
+                  Demi keamanan akun Anda, kami akan mengirimkan kode OTP ke alamat email
+                  <strong style={{ color: 'var(--text-primary)' }}> {user?.email}</strong>
+                </p>
+                <button
+                  className="btn btn-primary"
+                  onClick={sendOTP}
+                  disabled={otpSending}
+                  style={{
+                    padding: '12px 28px', borderRadius: 12,
+                    fontSize: '0.88rem', fontWeight: 600,
+                    background: '#0f2b52', display: 'inline-flex',
+                    alignItems: 'center', gap: 8
+                  }}
+                >
+                  <Send size={16} /> {otpSending ? 'Mengirim...' : 'Kirim Kode OTP'}
+                </button>
+              </div>
+            )}
+
+            {otpStep === 2 && (
+              <form onSubmit={changePassword} style={{ maxWidth: 440, margin: '0 auto' }}>
+                {/* OTP Input */}
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{
+                    fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)',
+                    display: 'block', marginBottom: 8
+                  }}>
+                    Kode OTP
+                  </label>
+                  <input
+                    className="form-input"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={e => setOtpCode(e.target.value)}
+                    required
+                    placeholder="Masukkan 6 digit OTP"
+                    style={{
+                      fontSize: '1.1rem', letterSpacing: '0.3em', fontWeight: 600,
+                      textAlign: 'center', borderRadius: 12
+                    }}
+                  />
+                  <div style={{ marginTop: 8, textAlign: 'center' }}>
+                    {otpCountdown > 0 ? (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                        Kirim ulang dalam <strong style={{ color: '#2563eb' }}>{otpCountdown}s</strong>
+                      </span>
+                    ) : (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={resendOTP}
+                        style={{ padding: '4px 12px', fontSize: '0.78rem', color: '#2563eb' }}>
+                        Kirim Ulang OTP
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0',
+                  color: 'var(--text-muted)', fontSize: '0.75rem'
+                }}>
+                  <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+                  Kata Sandi Baru
+                  <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: 8 }}>
+                    Kata Sandi Baru
+                  </label>
+                  <input
+                    className="form-input"
+                    type="password"
+                    value={pwForm.new_password}
+                    onChange={e => setPwForm({...pwForm, new_password: e.target.value})}
+                    required
+                    minLength={8}
+                    style={{ borderRadius: 12 }}
+                  />
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    {[
+                      { test: pwForm.new_password.length >= 8, label: '8+ karakter' },
+                      { test: /[A-Z]/.test(pwForm.new_password), label: 'Huruf besar' },
+                      { test: /[a-z]/.test(pwForm.new_password), label: 'Huruf kecil' },
+                      { test: /[0-9]/.test(pwForm.new_password), label: 'Angka' },
+                    ].map((r, i) => (
+                      <span key={i} style={{
+                        fontSize: '0.7rem', fontWeight: 500,
+                        padding: '3px 8px', borderRadius: 6,
+                        background: r.test ? 'rgba(5, 150, 105, 0.08)' : 'rgba(107, 114, 128, 0.08)',
+                        color: r.test ? '#059669' : 'var(--text-muted)',
+                        border: `1px solid ${r.test ? 'rgba(5, 150, 105, 0.2)' : 'transparent'}`,
+                        transition: 'all 0.2s ease'
+                      }}>
+                        {r.test ? '✓' : '○'} {r.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 24 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: 8 }}>
+                    Konfirmasi Kata Sandi
+                  </label>
+                  <input
+                    className="form-input"
+                    type="password"
+                    value={pwForm.confirm_password}
+                    onChange={e => setPwForm({...pwForm, confirm_password: e.target.value})}
+                    required
+                    style={{ borderRadius: 12 }}
+                  />
+                  {pwForm.confirm_password && (
+                    <p style={{
+                      fontSize: '0.75rem', marginTop: 6,
+                      color: pwForm.new_password === pwForm.confirm_password ? '#059669' : '#ef4444',
+                      display: 'flex', alignItems: 'center', gap: 4
+                    }}>
+                      {pwForm.new_password === pwForm.confirm_password
+                        ? <><CheckCircle size={13} /> Kata sandi cocok</>
+                        : <><Info size={13} /> Kata sandi tidak cocok</>
+                      }
+                    </p>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button type="button" className="btn btn-ghost" onClick={() => setOtpStep(1)}
+                    style={{ borderRadius: 12, flex: 1 }}>
+                    Kembali
+                  </button>
+                  <button type="submit" className="btn btn-primary"
+                    style={{
+                      borderRadius: 12, flex: 2, background: '#0f2b52',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                    }}>
+                    <Lock size={16} /> Ganti Kata Sandi
+                  </button>
+                </div>
+              </form>
             )}
           </div>
         </div>
-      </div>
-
-      {msg && <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, color: '#059669', fontSize: '0.85rem' }}>{msg}</div>}
-      {error && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', marginBottom: 16, color: '#dc2626', fontSize: '0.85rem' }}>{error}</div>}
-
-      <div className="filters" style={{ marginBottom: 20 }}>
-        <button className={`filter-btn ${tab === 'profil' ? 'active' : ''}`} onClick={() => { setTab('profil'); setMsg(''); setError(''); }}>Informasi Profil</button>
-        <button className={`filter-btn ${tab === 'password' ? 'active' : ''}`} onClick={() => { setTab('password'); setMsg(''); setError(''); setOtpStep(1); }}>Ganti Kata Sandi</button>
-      </div>
-
-      {tab === 'profil' && (
-        <div className="card">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
-            <div>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Nama</label>
-              <p style={{ fontSize: '0.95rem' }}>{user?.nama}</p>
-            </div>
-            <div>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Email / Akun</label>
-              <p style={{ fontSize: '0.95rem' }}>{user?.email}</p>
-            </div>
-            <div>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Jabatan</label>
-              <p style={{ fontSize: '0.95rem' }}>
-                {allJabatan.length > 0 ? allJabatan.map(j => formatJabatan(j.nama_jabatan)).join(', ') : (formatJabatan(user?.nama_jabatan) || roleLabel[user?.role])}
-              </p>
-            </div>
-            <div>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Peran</label>
-              <p style={{ fontSize: '0.95rem' }}>{roleLabel[user?.role] || user?.role}</p>
-            </div>
-          </div>
-          <p style={{ marginTop: 16, color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-            Untuk mengubah nama, email, atau jabatan, silakan hubungi Admin.
-          </p>
-        </div>
       )}
 
-
-      {tab === 'password' && (
-        <div className="card">
-          {otpStep === 1 && (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <ShieldCheck size={48} style={{ color: 'var(--accent)', marginBottom: 16, opacity: 0.7 }} />
-              <h3 style={{ marginBottom: 8 }}>Verifikasi OTP</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 24 }}>
-                Untuk keamanan, kami perlu mengirimkan kode OTP ke email Anda sebelum mengganti kata sandi.
-              </p>
-              <button className="btn btn-primary" onClick={sendOTP} disabled={otpSending}>
-                <Send size={16} /> {otpSending ? 'Mengirim...' : 'Kirim Kode OTP'}
-              </button>
-            </div>
-          )}
-
-          {otpStep === 2 && (
-            <form onSubmit={changePassword}>
-              <div className="form-group">
-                <label>Kode OTP (6 digit)</label>
-                <input className="form-input" maxLength={6} value={otpCode} onChange={e => setOtpCode(e.target.value)} required placeholder="Masukkan 6 digit OTP" />
-                <div style={{ marginTop: 6 }}>
-                  {otpCountdown > 0 ? (
-                    <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Kirim ulang OTP dalam {otpCountdown} detik</small>
-                  ) : (
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={resendOTP} style={{ padding: '4px 8px', fontSize: '0.75rem' }}>
-                      Kirim Ulang OTP
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Kata Sandi Baru</label>
-                <input className="form-input" type="password" value={pwForm.new_password} onChange={e => setPwForm({...pwForm, new_password: e.target.value})} required minLength={8} />
-                <small style={{color:'var(--text-muted)',fontSize:'0.75rem'}}>Min 8 karakter, huruf besar & kecil, angka</small>
-              </div>
-              <div className="form-group">
-                <label>Konfirmasi Kata Sandi Baru</label>
-                <input className="form-input" type="password" value={pwForm.confirm_password} onChange={e => setPwForm({...pwForm, confirm_password: e.target.value})} required />
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setOtpStep(1)}>Kembali</button>
-                <button type="submit" className="btn btn-primary"><Lock size={16} /> Ganti Kata Sandi</button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-
-      {/* Modal Crop Foto */}
+      {/* ═══ Modal Crop Foto ═══ */}
       {showCropModal && cropImage && (
         <div className="modal-overlay" onClick={() => setShowCropModal(false)} style={{ zIndex: 1100 }}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
-            <div className="modal-header">
-              <h2>Sesuaikan Foto Profil</h2>
-              <button className="modal-close" onClick={() => setShowCropModal(false)}>×</button>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420, borderRadius: 16, overflow: 'hidden' }}>
+            <div style={{
+              background: '#0f2b52', padding: '18px 24px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Camera size={18} color="white" />
+                <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', margin: 0 }}>Sesuaikan Foto Profil</h2>
+              </div>
+              <button onClick={() => setShowCropModal(false)} style={{
+                background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8,
+                width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: '#fff', fontSize: '1.1rem'
+              }}>×</button>
             </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-              <img
-                ref={imgRef}
-                src={cropImage}
-                alt=""
-                style={{ display: 'none' }}
-                onLoad={() => drawCropPreview()}
-              />
-
+            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+              <img ref={imgRef} src={cropImage} alt="" style={{ display: 'none' }} onLoad={() => drawCropPreview()} />
               <div
                 style={{
                   width: 200, height: 200, borderRadius: '50%', overflow: 'hidden',
-                  border: '3px solid var(--accent)', cursor: isDragging ? 'grabbing' : 'grab',
-                  position: 'relative', background: '#1a1a2e'
+                  border: '3px solid #2563eb', cursor: isDragging ? 'grabbing' : 'grab',
+                  position: 'relative', background: '#1a1a2e',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
                 }}
                 onMouseDown={handleCropMouseDown}
                 onMouseMove={handleCropMouseMove}
@@ -362,83 +721,78 @@ export default function Profile() {
               >
                 <canvas ref={canvasRef} style={{ width: 200, height: 200 }} />
               </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                 <Move size={14} /> Geser foto untuk menyesuaikan posisi
               </div>
-
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setCropScale(s => Math.max(0.2, s - 0.1)); }}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCropScale(s => Math.max(0.2, s - 0.1))}>
                   <ZoomOut size={16} />
                 </button>
-                <input
-                  type="range"
-                  min="0.2"
-                  max="3"
-                  step="0.05"
-                  value={cropScale}
+                <input type="range" min="0.2" max="3" step="0.05" value={cropScale}
                   onChange={e => setCropScale(parseFloat(e.target.value))}
-                  style={{ flex: 1, accentColor: 'var(--accent)' }}
-                />
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setCropScale(s => Math.min(3, s + 0.1)); }}>
+                  style={{ flex: 1, accentColor: '#2563eb' }} />
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCropScale(s => Math.min(3, s + 0.1))}>
                   <ZoomIn size={16} />
                 </button>
               </div>
-
-              {(() => { setTimeout(drawCropPreview, 0); return null; })()}
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setShowCropModal(false)}>Batal</button>
-              <button className="btn btn-primary" onClick={handleCropUpload}>Simpan Foto</button>
+            <div style={{
+              padding: '16px 24px', borderTop: '1px solid var(--border-color)',
+              display: 'flex', gap: 10, justifyContent: 'flex-end', background: 'var(--bg-secondary)'
+            }}>
+              <button className="btn btn-ghost" onClick={() => setShowCropModal(false)} style={{ borderRadius: 10 }}>Batal</button>
+              <button className="btn btn-primary" onClick={handleCropUpload} style={{ borderRadius: 10, background: '#0f2b52' }}>Simpan Foto</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Konfirmasi Hapus Foto */}
+      {/* ═══ Modal Konfirmasi Hapus Foto ═══ */}
       {showDeletePhotoModal && (
         <div className="modal-overlay" onClick={() => setShowDeletePhotoModal(false)} style={{ zIndex: 1100 }}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400, textAlign: 'center' }}>
-            <div className="modal-body" style={{ padding: '32px 24px' }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400, textAlign: 'center', borderRadius: 16 }}>
+            <div style={{ padding: '36px 28px 28px' }}>
               <div style={{
-                width: 56, height: 56, borderRadius: '50%',
-                background: 'rgba(239,68,68,0.15)', display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 16px', color: 'var(--danger)'
+                width: 60, height: 60, borderRadius: 16,
+                background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(239,68,68,0.15))',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 20px', color: '#ef4444'
               }}>
                 <Trash2 size={28} />
               </div>
-              <h3 style={{ marginBottom: 8, fontSize: '1.1rem' }}>Hapus Foto Profil</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 24 }}>
-                Apakah Anda yakin ingin menghapus foto profil? Foto akan diganti dengan inisial nama.
+              <h3 style={{ marginBottom: 8, fontSize: '1.1rem', fontWeight: 700 }}>Hapus Foto Profil?</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: 28, lineHeight: 1.5 }}>
+                Foto profil akan dihapus dan diganti dengan inisial nama Anda.
               </p>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                <button className="btn btn-ghost" onClick={() => setShowDeletePhotoModal(false)} style={{ minWidth: 100 }}>Batal</button>
-                <button className="btn btn-danger" onClick={handleDeletePhoto} style={{ minWidth: 100 }}>Hapus</button>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                <button className="btn btn-ghost" onClick={() => setShowDeletePhotoModal(false)}
+                  style={{ minWidth: 100, borderRadius: 10 }}>Batal</button>
+                <button className="btn btn-danger" onClick={handleDeletePhoto}
+                  style={{ minWidth: 100, borderRadius: 10 }}>Hapus</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Preview Foto Profil */}
+      {/* ═══ Modal Preview Foto Profil ═══ */}
       {showPhotoPreview && user?.foto_profil && (
         <div
           onClick={() => setShowPhotoPreview(false)}
           style={{
             position: 'fixed', inset: 0, zIndex: 1200,
-            background: 'rgba(0,0,0,0.85)',
+            background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'zoom-out'
           }}
         >
           <img
-            src={`http://localhost:8080/uploads/${user.foto_profil}`}
+            src={getUploadUrl(user?.foto_profil)}
             alt="Foto Profil"
             style={{
-              maxWidth: '90vw', maxHeight: '90vh',
-              borderRadius: 12,
-              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+              maxWidth: '85vw', maxHeight: '85vh',
+              borderRadius: 16,
+              boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
               objectFit: 'contain'
             }}
             onClick={e => e.stopPropagation()}

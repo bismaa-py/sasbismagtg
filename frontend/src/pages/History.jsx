@@ -32,7 +32,7 @@ export default function History() {
     const suffix = qs ? '?' + qs : '';
     try {
       const smPromise = api.get(`/surat-masuk/history${suffix}`);
-      // User biasa tidak punya riwayat surat keluar
+      // User biasa dan waka tidak punya riwayat surat keluar
       const skPromise = (user.role === 'admin' || user.role === 'kepsek')
         ? api.get(`/surat-keluar/history${suffix}`)
         : Promise.resolve({ data: { success: true, data: [] } });
@@ -104,7 +104,7 @@ export default function History() {
     const parts = String(text).split(regex);
     return parts.map((part, i) =>
       regex.test(part) ? (
-        <mark key={i} style={{ backgroundColor: '#fef08a', color: '#0f2b52', padding: '0 2px', borderRadius: '2px' }}>
+        <mark key={i} style={{ backgroundColor: '#dbeafe', color: '#0f2b52', padding: '2px 4px', borderRadius: '4px', fontWeight: 600 }}>
           {part}
         </mark>
       ) : (
@@ -115,69 +115,71 @@ export default function History() {
 
   return (
     <div className="page">
+      <div className="sticky-filter-container">
+        {/* Tab: hanya untuk admin/kepsek yang punya masuk + keluar */}
+        {(user.role === 'admin' || user.role === 'kepsek') && (
+          <div className="filters" style={{ marginBottom: 12 }}>
+            <button className={`filter-btn ${tab === 'semua' ? 'active' : ''}`} onClick={() => setTab('semua')}>
+              <FileText size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Semua Surat
+            </button>
+            <button className={`filter-btn ${tab === 'masuk' ? 'active' : ''}`} onClick={() => setTab('masuk')}>
+              <Mail size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Surat Masuk
+            </button>
+            <button className={`filter-btn ${tab === 'keluar' ? 'active' : ''}`} onClick={() => setTab('keluar')}>
+              <Send size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Surat Keluar
+            </button>
+          </div>
+        )}
 
-      {/* Tab: hanya untuk admin/kepsek yang punya masuk + keluar */}
-      {(user.role === 'admin' || user.role === 'kepsek') && (
-        <div className="filters" style={{ marginBottom: 16 }}>
-          <button className={`filter-btn ${tab === 'semua' ? 'active' : ''}`} onClick={() => setTab('semua')}>
-            <FileText size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Semua Surat
-          </button>
-          <button className={`filter-btn ${tab === 'masuk' ? 'active' : ''}`} onClick={() => setTab('masuk')}>
-            <Mail size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Surat Masuk
-          </button>
-          <button className={`filter-btn ${tab === 'keluar' ? 'active' : ''}`} onClick={() => setTab('keluar')}>
-            <Send size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Surat Keluar
-          </button>
-        </div>
-      )}
-
-      {/* Filter & pencarian */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input className="form-input" placeholder="Cari no. surat, perihal..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
-        </div>
-        {user.role !== 'user' && (
-          <select className="form-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: 'auto', minWidth: 160 }}>
-            <option value="">Semua Status</option>
-            <option value="disetujui">Disetujui</option>
-            <option value="ditolak">Ditolak</option>
+        {/* Filter & pencarian */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input className="form-input" placeholder="Cari no. surat, perihal..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+          </div>
+          {user.role !== 'user' && (
+            <select className="form-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: 'auto', minWidth: 160 }}>
+              <option value="">Semua Status</option>
+              <option value="disetujui">Disetujui</option>
+              <option value="ditolak">Ditolak</option>
+            </select>
+          )}
+          <select className="form-input" value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ width: 'auto', minWidth: 140 }}>
+            <option value="terbaru">Terbaru</option>
+            <option value="terlama">Terlama</option>
           </select>
-        )}
-        <select className="form-input" value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ width: 'auto', minWidth: 140 }}>
-          <option value="terbaru">Terbaru</option>
-          <option value="terlama">Terlama</option>
-        </select>
+        </div>
+
+        {/* Filter rentang tanggal */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 0, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Calendar size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Dari:</label>
+            <DateInput className="form-input" value={dateFrom} onChange={handleDateFromChange} max={dateTo || undefined} style={{ width: 'auto', minWidth: 150 }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Sampai:</label>
+            <DateInput className="form-input" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} style={{ width: 'auto', minWidth: 150 }} />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button className="btn btn-ghost btn-sm" onClick={clearDateFilter} style={{ marginLeft: 8 }}>
+              <X size={14} /> Atur Ulang
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Filter rentang tanggal */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Calendar size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Dari:</label>
-          <DateInput className="form-input" value={dateFrom} onChange={handleDateFromChange} max={dateTo || undefined} style={{ width: 'auto', minWidth: 150 }} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Sampai:</label>
-          <DateInput className="form-input" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} style={{ width: 'auto', minWidth: 150 }} />
-        </div>
-        {(dateFrom || dateTo) && (
-          <button className="btn btn-ghost btn-sm" onClick={clearDateFilter}>
-            <X size={14} /> Atur Ulang
-          </button>
-        )}
-      </div>
-
-      {displayData.length === 0 ? (
-        <div className="empty-state"><HistoryIcon size={48} /><h3>Belum ada riwayat</h3><p>Surat yang sudah diterima atau diproses akan muncul di sini.</p></div>
-      ) : (
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>No. Surat</th><th>Perihal</th><th>Asal/Tujuan</th><th>Tanggal</th><th>Tipe</th><th>Status</th><th>Aksi</th>
-              </tr>
-            </thead>
+      <div style={{ marginTop: 24 }}>
+        {displayData.length === 0 ? (
+          <div className="empty-state"><HistoryIcon size={48} /><h3>Belum ada riwayat</h3><p>Surat yang sudah diterima atau diproses akan muncul di sini.</p></div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>No. Surat</th><th>Perihal</th><th>Asal/Tujuan</th><th>Tanggal/Waktu</th><th>Tipe</th><th>Status</th><th>Aksi</th>
+                </tr>
+              </thead>
             <tbody>
               {displayData.map((s) => (
                 <tr key={s._uniqueKey}>
@@ -198,6 +200,7 @@ export default function History() {
           </table>
         </div>
       )}
+      </div>
     </div>
   );
 }

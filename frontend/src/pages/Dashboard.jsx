@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Send, Clock, History, FileText, Calendar } from 'lucide-react';
 import api from '../api/axios';
-import { formatTanggalShort } from '../utils/formatDate';
+import { formatTanggalShort, parseBackendDate } from '../utils/formatDate';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -13,7 +13,9 @@ export default function Dashboard() {
   const [recentSuratKeluar, setRecentSuratKeluar] = useState([]);
   const [activeTab, setActiveTab] = useState('masuk');
 
-  const isAdminOrKepsek = user.role === 'admin' || user.role === 'kepsek' || user.role === 'pegawai';
+  const isAdminOrKepsek = user.role === 'admin' || user.role === 'kepsek' || user.role === 'pegawai' || user.role === 'waka';
+  // Waka hanya bisa lihat surat masuk (disposisi), tidak punya akses surat keluar
+  const hasSuratKeluar = user.role === 'admin' || user.role === 'kepsek' || user.role === 'pegawai';
 
   useEffect(() => {
     api.get('/dashboard/stats').then(res => {
@@ -24,16 +26,29 @@ export default function Dashboard() {
     api.get('/surat-masuk').then(res => {
       if (res.data.success) {
         const data = res.data.data || [];
-        setRecentSuratMasuk(data.slice(0, 5));
+        // Filter surat terbaru: hanya 3 hari terakhir
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        const recent = data.filter(s => {
+          const parsed = parseBackendDate(s.created_at);
+          return parsed && parsed.date >= threeDaysAgo;
+        });
+        setRecentSuratMasuk(recent.slice(0, 5));
       }
     }).catch(() => {});
 
-    // Ambil surat keluar terbaru (hanya untuk admin/kepsek)
-    if (isAdminOrKepsek) {
+    // Ambil surat keluar terbaru (hanya untuk admin/kepsek/pegawai, bukan waka)
+    if (hasSuratKeluar) {
       api.get('/surat-keluar').then(res => {
         if (res.data.success) {
           const data = res.data.data || [];
-          setRecentSuratKeluar(data.slice(0, 5));
+          const threeDaysAgo = new Date();
+          threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+          const recent = data.filter(s => {
+            const parsed = parseBackendDate(s.created_at);
+            return parsed && parsed.date >= threeDaysAgo;
+          });
+          setRecentSuratKeluar(recent.slice(0, 5));
         }
       }).catch(() => {});
     }
@@ -47,23 +62,16 @@ export default function Dashboard() {
     value: stats.total_surat_masuk,
     icon: <Mail size={24} />,
     color: 'blue',
-    desc: 'Total surat masuk terdaftar'
+    desc: 'Surat masuk terbaru belum diproses'
   });
 
-  if (isAdminOrKepsek) {
+  if (hasSuratKeluar) {
     statCards.push({
       label: 'Surat Keluar',
       value: stats.total_surat_keluar,
       icon: <Send size={24} />,
       color: 'green',
-      desc: 'Total surat keluar diarsipkan'
-    });
-    statCards.push({
-      label: 'Menunggu Persetujuan',
-      value: stats.surat_menunggu_persetujuan,
-      icon: <Clock size={24} />,
-      color: 'yellow',
-      desc: 'Perlu verifikasi & tanda tangan'
+      desc: 'Surat keluar terbaru belum diproses'
     });
   }
 
@@ -97,6 +105,7 @@ export default function Dashboard() {
           {user.role === 'admin' && 'Selamat datang di panel kendali sistem. Kelola surat, pengguna, dan pantau log aktivitas dari sini.'}
           {user.role === 'kepsek' && 'Anda memiliki akses penuh untuk meninjau, menyetujui, dan menandatangani surat masuk maupun keluar.'}
           {user.role === 'pegawai' && 'Kelola administrasi persuratan, input surat masuk/keluar baru, dan pantau disposisi dengan mudah.'}
+          {user.role === 'waka' && 'Kelola disposisi surat dan teruskan ke penerima terkait.'}
           {user.role === 'user' && 'Tinjau surat disposisi yang telah diteruskan kepada Anda dan berikan tanggapan yang diperlukan.'}
         </p>
       </div>
@@ -123,8 +132,8 @@ export default function Dashboard() {
               {isAdminOrKepsek ? 'Surat Terbaru' : 'Surat Masuk Terbaru'}
             </h3>
           </div>
-          {/* Tab hanya untuk admin/kepsek */}
-          {isAdminOrKepsek && (
+          {/* Tab hanya untuk admin/kepsek/pegawai yang punya surat keluar */}
+          {hasSuratKeluar && (
             <div className="filters" style={{ margin: 0, gap: 4 }}>
               <button
                 className={`filter-btn ${activeTab === 'masuk' ? 'active' : ''}`}
@@ -160,7 +169,7 @@ export default function Dashboard() {
                       <th>No. Surat</th>
                       <th>Perihal</th>
                       <th>Asal</th>
-                      <th>Tanggal</th>
+                      <th>Tanggal/Waktu</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -190,8 +199,8 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* Surat Keluar (hanya untuk admin/kepsek saat tab keluar aktif) */}
-        {isAdminOrKepsek && activeTab === 'keluar' && (
+        {/* Surat Keluar (hanya untuk admin/kepsek/pegawai saat tab keluar aktif) */}
+        {hasSuratKeluar && activeTab === 'keluar' && (
           <>
             {recentSuratKeluar.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
@@ -206,7 +215,7 @@ export default function Dashboard() {
                       <th>No. Surat</th>
                       <th>Perihal</th>
                       <th>Tujuan</th>
-                      <th>Tanggal</th>
+                      <th>Tanggal/Waktu</th>
                       <th>Status</th>
                     </tr>
                   </thead>

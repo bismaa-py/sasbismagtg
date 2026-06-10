@@ -196,7 +196,13 @@ export default function SuratMasuk() {
     const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
     const parts = String(text).split(regex);
     return parts.map((part, i) =>
-      regex.test(part) ? <mark key={i}>{part}</mark> : part
+      regex.test(part) ? (
+        <mark key={i} style={{ backgroundColor: '#dbeafe', color: '#0f2b52', padding: '2px 4px', borderRadius: '4px', fontWeight: 600 }}>
+          {part}
+        </mark>
+      ) : (
+        part
+      )
     );
   };
 
@@ -206,51 +212,54 @@ export default function SuratMasuk() {
 
   return (
     <div className="page">
-      {canManage && (
-        <div className="page-header" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn btn-primary" onClick={openCreate}><Plus size={18} /> Buat Surat Masuk</button>
-        </div>
-      )}
+      <div className="sticky-filter-container">
+        {canManage && (
+          <div className="page-header" style={{ justifyContent: 'flex-end', marginBottom: 12 }}>
+            <button className="btn btn-primary" onClick={openCreate}><Plus size={18} /> Buat Surat Masuk</button>
+          </div>
+        )}
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input className="form-input" placeholder="Cari no. surat, perihal, atau asal..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
-        </div>
-        {user.role !== 'user' && (
-          <select className="form-input" value={filter} onChange={e => setFilter(e.target.value)} style={{ width: 'auto', minWidth: 140 }}>
-            <option value="">Semua</option>
-            <option value="menunggu">Menunggu</option>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input className="form-input" placeholder="Cari no. surat, perihal, atau asal..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+          </div>
+          {user.role !== 'user' && (
+            <select className="form-input" value={filter} onChange={e => setFilter(e.target.value)} style={{ width: 'auto', minWidth: 140 }}>
+              <option value="">Semua</option>
+              <option value="menunggu">Menunggu</option>
+            </select>
+          )}
+          <select className="form-input" value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ width: 'auto', minWidth: 140 }}>
+            <option value="terbaru">Terbaru</option>
+            <option value="terlama">Terlama</option>
           </select>
-        )}
-        <select className="form-input" value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ width: 'auto', minWidth: 140 }}>
-          <option value="terbaru">Terbaru</option>
-          <option value="terlama">Terlama</option>
-        </select>
+        </div>
+
+        {/* Filter rentang tanggal */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 0, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Calendar size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Dari:</label>
+            <DateInput className="form-input" value={dateFrom} onChange={handleDateFromChange} max={dateTo || undefined} style={{ width: 'auto', minWidth: 150 }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Sampai:</label>
+            <DateInput className="form-input" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} style={{ width: 'auto', minWidth: 150 }} />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button className="btn btn-ghost btn-sm" onClick={clearDateFilter} style={{ marginLeft: 8 }}>
+              <X size={14} /> Atur Ulang
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Filter rentang tanggal */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Calendar size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Dari:</label>
-          <DateInput className="form-input" value={dateFrom} onChange={handleDateFromChange} max={dateTo || undefined} style={{ width: 'auto', minWidth: 150 }} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Sampai:</label>
-          <DateInput className="form-input" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} style={{ width: 'auto', minWidth: 150 }} />
-        </div>
-        {(dateFrom || dateTo) && (
-          <button className="btn btn-ghost btn-sm" onClick={clearDateFilter}>
-            <X size={14} /> Atur Ulang
-          </button>
-        )}
-      </div>
-
-      {filteredList.length === 0 ? (
-        <div className="empty-state"><Mail size={48} /><h3>{search ? 'Tidak ada hasil' : 'Belum ada surat masuk'}</h3><p>{search ? 'Coba kata kunci lain' : 'Surat masuk akan muncul di sini.'}</p></div>
-      ) : (
-        <div className="surat-grid">
+      <div style={{ marginTop: 24 }}>
+        {filteredList.length === 0 ? (
+          <div className="empty-state"><Mail size={48} /><h3>{search ? 'Tidak ada hasil' : 'Belum ada surat masuk'}</h3><p>{search ? 'Coba kata kunci lain' : 'Surat masuk akan muncul di sini.'}</p></div>
+        ) : (
+          <div className="surat-grid">
           {filteredList.map(s => (
             <div className="surat-card" key={s.id}>
               <div className="surat-card-header">
@@ -268,7 +277,7 @@ export default function SuratMasuk() {
           ))}
         </div>
       )}
-
+      </div>
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" onClick={e => e.stopPropagation()}>

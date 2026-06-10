@@ -49,14 +49,43 @@ func main() {
 	db.Exec("ALTER TABLE disposisi ADD COLUMN IF NOT EXISTS batas_waktu TEXT DEFAULT ''")
 	// Jabatan-based forwarding: track which jabatan the surat is forwarded to
 	db.Exec("ALTER TABLE disposisi ADD COLUMN IF NOT EXISTS id_jabatan_penerima INTEGER REFERENCES jabatan(id_jabatan)")
+	// Waka flow: track catatan waka and which waka forwarded
+	db.Exec("ALTER TABLE disposisi ADD COLUMN IF NOT EXISTS catatan_waka TEXT DEFAULT ''")
+	db.Exec("ALTER TABLE disposisi ADD COLUMN IF NOT EXISTS id_waka INTEGER REFERENCES users(id_user)")
 
 	// Fix notifikasi jenis constraint to include all notification types
 	db.Exec("ALTER TABLE notifikasi DROP CONSTRAINT IF EXISTS notifikasi_jenis_check")
 	db.Exec(`ALTER TABLE notifikasi ADD CONSTRAINT notifikasi_jenis_check CHECK (
 		jenis IN ('surat_masuk_baru','surat_keluar_baru','surat_disetujui','surat_ditolak',
 		'surat_masuk_dikonfirmasi','surat_keluar_dikonfirmasi','permintaan_persetujuan_akun',
-		'review_surat','surat_diteruskan')
+		'review_surat','surat_diteruskan','surat_diteruskan_waka','disposisi_diterima')
 	)`)
+
+	// Jabatan cleanup: ensure a generic 'guru' jabatan exists
+	db.Exec(`INSERT INTO jabatan (nama_jabatan, level_akses) VALUES ('guru', 'user') ON CONFLICT DO NOTHING`)
+
+	// Migrate any existing 'user' jabatan to 'guru'
+	db.Exec(`UPDATE user_jabatan 
+		SET id_jabatan = (SELECT id_jabatan FROM jabatan WHERE nama_jabatan = 'guru' AND level_akses = 'user' LIMIT 1)
+		WHERE id_jabatan = (SELECT id_jabatan FROM jabatan WHERE nama_jabatan = 'user' AND level_akses = 'user' LIMIT 1)`)
+
+	// Remove old specific user-level jabatan that are no longer needed (keep only guru)
+	db.Exec(`DELETE FROM user_jabatan WHERE id_jabatan IN (
+		SELECT id_jabatan FROM jabatan WHERE level_akses = 'user' AND nama_jabatan != 'guru'
+	)`)
+
+	// Ensure every user without a jabatan gets the generic 'guru' jabatan
+	db.Exec(`INSERT INTO user_jabatan (id_user, id_jabatan, is_primary)
+		SELECT u.id_user, j.id_jabatan, true
+		FROM users u
+		CROSS JOIN jabatan j
+		WHERE j.nama_jabatan = 'guru' AND j.level_akses = 'user'
+		AND NOT EXISTS (SELECT 1 FROM user_jabatan uj WHERE uj.id_user = u.id_user)
+		ON CONFLICT DO NOTHING`)
+
+	// Clean up duplicate non-primary user_jabatan entries (enforce single jabatan)
+	db.Exec(`DELETE FROM user_jabatan WHERE is_primary = FALSE`)
+
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
 	smRepo := repository.NewSuratMasukRepository(db)
@@ -118,9 +147,9 @@ func main() {
 			auth.PUT("/notifications/:id/read", notifHandler.MarkAsRead)
 			auth.PUT("/notifications/read-all", notifHandler.MarkAllAsRead)
 
-			// Users list accessible to admin, kepsek, AND pegawai (for forward modal)
+			// Users list accessible to admin, kepsek, pegawai, AND waka (for forward modal)
 			adminOrKepsek := auth.Group("")
-			adminOrKepsek.Use(middleware.RequireRole("admin", "kepsek", "pegawai"))
+			adminOrKepsek.Use(middleware.RequireRole("admin", "kepsek", "pegawai", "waka"))
 			{
 				adminOrKepsek.GET("/users", userHandler.List)
 			}
@@ -156,6 +185,13 @@ func main() {
 			{
 				kepsek.PUT("/surat-masuk/:id/review", smHandler.Review)
 				kepsek.PUT("/surat-keluar/:id/review", skHandler.Review)
+			}
+
+			// Waka: forward surat to individual users
+			wakaGroup := auth.Group("")
+			wakaGroup.Use(middleware.RequireRole("waka"))
+			{
+				wakaGroup.PUT("/surat-masuk/:id/teruskan-waka", smHandler.ForwardWaka)
 			}
 
 			// Surat Keluar - history MUST be before :id to avoid route conflict

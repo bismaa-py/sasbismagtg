@@ -4,8 +4,8 @@ import { ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
 
 const panduanAdmin = [
   {
-    id: 'login',
-    title: 'Login ke Sistem',
+    id: 'Masuk',
+    title: 'Masuk ke Sistem',
     steps: [
       'Buka halaman login di browser.',
       'Masukkan email dan kata sandi akun Admin/TU.',
@@ -101,8 +101,8 @@ const panduanAdmin = [
 
 const panduanKepsek = [
   {
-    id: 'login',
-    title: 'Login ke Sistem',
+    id: 'Masuk',
+    title: 'Masuk ke Sistem',
     steps: [
       'Buka halaman login di browser.',
       'Masukkan email dan kata sandi akun Kepala Sekolah.',
@@ -162,8 +162,8 @@ const panduanKepsek = [
 
 const panduanUser = [
   {
-    id: 'login',
-    title: 'Login ke Sistem',
+    id: 'Masuk',
+    title: 'Masuk ke Sistem',
     steps: [
       'Buka halaman login di browser.',
       'Masukkan email dan kata sandi yang diberikan oleh Admin.',
@@ -232,8 +232,8 @@ const panduanUser = [
 
 const panduanPegawai = [
   {
-    id: 'login',
-    title: 'Login ke Sistem',
+    id: 'Masuk',
+    title: 'Masuk ke Sistem',
     steps: [
       'Buka halaman login di browser.',
       'Masukkan email dan kata sandi akun Pegawai TU.',
@@ -306,10 +306,71 @@ const panduanPegawai = [
   }
 ];
 
-const alurAdmin = ['Admin membuat surat', 'Dikirim ke Kepsek', 'Kepsek meninjau', 'Admin meneruskan ke pengguna', 'Pengguna menerima', 'Masuk riwayat'];
-const alurPegawai = ['Pegawai TU membuat surat', 'Dikirim ke Kepsek', 'Kepsek meninjau', 'Pegawai TU meneruskan ke pengguna', 'Pengguna menerima', 'Masuk riwayat'];
+const panduanWaka = [
+  {
+    id: 'Masuk',
+    title: 'Masuk ke Sistem',
+    steps: [
+      'Buka halaman login di browser.',
+      'Masukkan email dan kata sandi akun Waka.',
+      'Klik "Masuk" untuk masuk ke dashboard.',
+    ]
+  },
+  {
+    id: 'lihat-surat',
+    title: 'Melihat Surat Masuk',
+    steps: [
+      'Buka menu "Surat Masuk" di sidebar.',
+      'Anda akan melihat surat yang telah diteruskan oleh Admin/TU kepada Anda.',
+      'Klik "Detail" untuk membuka informasi lengkap surat.',
+      'Klik "Lihat Lampiran" untuk melihat file PDF yang dilampirkan.'
+    ]
+  },
+  {
+    id: 'teruskan-ke-user',
+    title: 'Meneruskan Surat ke Pengguna',
+    steps: [
+      'Buka detail surat yang diteruskan kepada Anda.',
+      'Klik tombol "Teruskan ke Pengguna".',
+      'Centang pengguna yang akan menerima surat.',
+      'Tambahkan catatan/instruksi untuk penerima (opsional).',
+      'Klik "Teruskan" — pengguna yang dipilih akan mendapat notifikasi.',
+      'Surat otomatis masuk ke halaman "Riwayat" Anda.'
+    ]
+  },
+  {
+    id: 'riwayat',
+    title: 'Riwayat Surat',
+    steps: [
+      'Buka menu "Riwayat" untuk melihat semua surat yang sudah Anda teruskan.',
+      'Gunakan pencarian dan filter tanggal untuk mencari surat tertentu.'
+    ]
+  },
+  {
+    id: 'notifikasi',
+    title: 'Notifikasi',
+    steps: [
+      'Ikon lonceng di header menunjukkan jumlah notifikasi baru.',
+      'Klik untuk melihat daftar surat yang baru diteruskan kepada Anda.',
+      'Klik notifikasi untuk langsung membuka detail surat.'
+    ]
+  },
+  {
+    id: 'profil',
+    title: 'Pengaturan Profil',
+    steps: [
+      'Buka menu "Profil" di sidebar.',
+      'Klik ikon kamera untuk mengubah foto profil.',
+      'Untuk ganti kata sandi: tab "Ganti Kata Sandi" → kirim OTP → isi kata sandi baru.'
+    ]
+  }
+];
+
+const alurAdmin = ['Admin membuat surat', 'Dikirim ke Kepsek', 'Kepsek meninjau', 'Admin meneruskan ke Waka', 'Waka meneruskan ke pengguna', 'Pengguna menerima', 'Masuk riwayat'];
+const alurPegawai = ['Pegawai TU membuat surat', 'Dikirim ke Kepsek', 'Kepsek meninjau', 'Pegawai TU meneruskan ke Waka', 'Waka meneruskan ke pengguna', 'Pengguna menerima', 'Masuk riwayat'];
 const alurKepsek = ['Admin membuat surat', 'Notifikasi masuk', 'Kepsek buka detail', 'Setujui / Tolak', 'Masuk riwayat'];
-const alurUser = ['Admin meneruskan surat', 'Notifikasi masuk', 'Buka detail surat', 'Klik "Terima Surat"', 'Masuk riwayat'];
+const alurWaka = ['TU meneruskan surat', 'Notifikasi masuk', 'Buka detail surat', 'Pilih pengguna', 'Teruskan + catatan', 'Masuk riwayat'];
+const alurUser = ['Waka meneruskan surat', 'Notifikasi masuk', 'Buka detail surat', 'Surat otomatis terbaca', 'Masuk riwayat'];
 
 function AccordionItem({ item, index, isOpen, onToggle }) {
   return (
@@ -400,6 +461,7 @@ export default function PanduanPengguna() {
   if (role === 'admin') { panduan = panduanAdmin; alur = alurAdmin; }
   else if (role === 'pegawai') { panduan = panduanPegawai; alur = alurPegawai; }
   else if (role === 'kepsek') { panduan = panduanKepsek; alur = alurKepsek; }
+  else if (role === 'waka') { panduan = panduanWaka; alur = alurWaka; }
   else { panduan = panduanUser; alur = alurUser; }
 
   const toggle = (id) => setOpenId(prev => prev === id ? null : id);

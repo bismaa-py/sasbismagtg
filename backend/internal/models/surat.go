@@ -52,14 +52,20 @@ type ReviewSuratMasukRequest struct {
 }
 
 type ForwardSuratMasukRequest struct {
-	DiteruskanKe []int          `json:"diteruskan_ke"` // backward compat: just user IDs
-	Targets      []ForwardTarget `json:"targets"`       // new: user+jabatan pairs
+	DiteruskanKe []int          `json:"diteruskan_ke"` // user IDs of waka to forward to
+	Targets      []ForwardTarget `json:"targets"`       // backward compat: user+jabatan pairs
 }
 
 // ForwardTarget: each forwarding target specifies a user and which jabatan to target
 type ForwardTarget struct {
 	UserID    int `json:"user_id"`
 	JabatanID int `json:"jabatan_id"`
+}
+
+// ForwardWakaRequest: Waka forwards surat to individual users with a note
+type ForwardWakaRequest struct {
+	DiteruskanKe []int  `json:"diteruskan_ke" binding:"required"` // user IDs to forward to
+	CatatanWaka  string `json:"catatan_waka"`                     // note from waka to users
 }
 
 // ===== SURAT KELUAR =====
