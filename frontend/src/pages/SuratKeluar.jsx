@@ -5,7 +5,7 @@ import { useToast } from '../context/ToastContext';
 import { Plus, Eye, Edit, Trash2, Upload, X, Send, Search, Calendar } from 'lucide-react';
 import DateInput from '../components/DateInput';
 import api from '../api/axios';
-import { formatTanggalShort } from '../utils/formatDate';
+import { formatTanggalShort, getLocalTodayDateString, getLocalTodayDateTimeString } from '../utils/formatDate';
 
 // Template kode surat
 const kodeSuratOptions = [
@@ -271,11 +271,11 @@ export default function SuratKeluar() {
           <Calendar size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Dari:</label>
-            <DateInput className="form-input" value={dateFrom} onChange={handleDateFromChange} max={dateTo || undefined} style={{ width: 'auto', minWidth: 150 }} />
+            <DateInput className="form-input" value={dateFrom} onChange={handleDateFromChange} max={dateTo && dateTo < getLocalTodayDateString() ? dateTo : getLocalTodayDateString()} style={{ width: 'auto', minWidth: 150 }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Sampai:</label>
-            <DateInput className="form-input" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} style={{ width: 'auto', minWidth: 150 }} />
+            <DateInput className="form-input" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} max={getLocalTodayDateString()} style={{ width: 'auto', minWidth: 150 }} />
           </div>
           {(dateFrom || dateTo) && (
             <button className="btn btn-ghost btn-sm" onClick={clearDateFilter} style={{ marginLeft: 8 }}>
@@ -328,7 +328,7 @@ export default function SuratKeluar() {
                   <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Template otomatis terisi saat kode surat dipilih. Sesuaikan nomor urut sesuai kebutuhan.</small>
                 </div>
                 <div className="form-group"><label>Perihal *</label><input className="form-input" value={form.perihal} onChange={e => setForm({...form, perihal: e.target.value})} required /></div>
-                <div className="form-group"><label>Tanggal Surat *</label><input className="form-input" type="datetime-local" value={form.tanggal_surat} onChange={e => setForm({...form, tanggal_surat: e.target.value})} required /></div>
+                <div className="form-group"><label>Tanggal Surat *</label><input className="form-input" type="datetime-local" value={form.tanggal_surat} onChange={e => setForm({...form, tanggal_surat: e.target.value})} max={getLocalTodayDateTimeString()} required /></div>
                 <div className="form-group"><label>Lampiran (PDF) {!editItem && '*'}</label><div className="file-upload" onClick={() => document.getElementById('file-sk').click()}><Upload size={24} /><p>{file ? file.name : 'Klik untuk mengunggah'}</p><input id="file-sk" type="file" accept=".pdf" onChange={handleFileChange} /></div></div>
               </div>
               <div className="modal-footer">

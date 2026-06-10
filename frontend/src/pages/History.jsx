@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Eye, Mail, Send, History as HistoryIcon, Search, FileText, Calendar, X } from 'lucide-react';
 import DateInput from '../components/DateInput';
 import api from '../api/axios';
-import { formatTanggalShort } from '../utils/formatDate';
+import { formatTanggalShort, getLocalTodayDateString } from '../utils/formatDate';
 
 export default function History() {
   const { user, activeJabatanFilter } = useAuth();
@@ -155,11 +155,11 @@ export default function History() {
           <Calendar size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Dari:</label>
-            <DateInput className="form-input" value={dateFrom} onChange={handleDateFromChange} max={dateTo || undefined} style={{ width: 'auto', minWidth: 150 }} />
+            <DateInput className="form-input" value={dateFrom} onChange={handleDateFromChange} max={dateTo && dateTo < getLocalTodayDateString() ? dateTo : getLocalTodayDateString()} style={{ width: 'auto', minWidth: 150 }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Sampai:</label>
-            <DateInput className="form-input" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} style={{ width: 'auto', minWidth: 150 }} />
+            <DateInput className="form-input" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} max={getLocalTodayDateString()} style={{ width: 'auto', minWidth: 150 }} />
           </div>
           {(dateFrom || dateTo) && (
             <button className="btn btn-ghost btn-sm" onClick={clearDateFilter} style={{ marginLeft: 8 }}>

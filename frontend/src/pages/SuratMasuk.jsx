@@ -5,7 +5,7 @@ import { useToast } from '../context/ToastContext';
 import { Plus, Eye, Edit, Trash2, Upload, X, Search, Mail, Calendar } from 'lucide-react';
 import DateInput from '../components/DateInput';
 import api from '../api/axios';
-import { formatTanggalShort } from '../utils/formatDate';
+import { formatTanggalShort, getLocalTodayDateString, getLocalTodayDateTimeString } from '../utils/formatDate';
 
 // Template no surat otomatis
 const generateNoSuratMasuk = () => {
@@ -241,11 +241,11 @@ export default function SuratMasuk() {
           <Calendar size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Dari:</label>
-            <DateInput className="form-input" value={dateFrom} onChange={handleDateFromChange} max={dateTo || undefined} style={{ width: 'auto', minWidth: 150 }} />
+            <DateInput className="form-input" value={dateFrom} onChange={handleDateFromChange} max={dateTo && dateTo < getLocalTodayDateString() ? dateTo : getLocalTodayDateString()} style={{ width: 'auto', minWidth: 150 }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Sampai:</label>
-            <DateInput className="form-input" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} style={{ width: 'auto', minWidth: 150 }} />
+            <DateInput className="form-input" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} max={getLocalTodayDateString()} style={{ width: 'auto', minWidth: 150 }} />
           </div>
           {(dateFrom || dateTo) && (
             <button className="btn btn-ghost btn-sm" onClick={clearDateFilter} style={{ marginLeft: 8 }}>
@@ -292,7 +292,7 @@ export default function SuratMasuk() {
                 </div>
                 <div className="form-group"><label>Perihal *</label><input className="form-input" value={form.perihal_surat} onChange={e => setForm({ ...form, perihal_surat: e.target.value })} required /></div>
                 <div className="form-group"><label>Asal Surat *</label><input className="form-input" value={form.asal_surat} onChange={e => setForm({ ...form, asal_surat: e.target.value })} required placeholder="Contoh: Dinas Pendidikan Kab. Malang" /></div>
-                <div className="form-group"><label>Tanggal Surat *</label><input className="form-input" type="datetime-local" value={form.tanggal_surat} onChange={e => setForm({ ...form, tanggal_surat: e.target.value })} required /></div>
+                <div className="form-group"><label>Tanggal Surat *</label><input className="form-input" type="datetime-local" value={form.tanggal_surat} onChange={e => setForm({ ...form, tanggal_surat: e.target.value })} max={getLocalTodayDateTimeString()} required /></div>
                 <div className="form-group">
                   <label>Lampiran (PDF) {!editItem && '*'}</label>
                   <div className="file-upload" onClick={() => document.getElementById('file-sm').click()}>

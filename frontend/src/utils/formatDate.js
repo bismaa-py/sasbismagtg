@@ -106,3 +106,19 @@ export function formatJabatan(str) {
     return word.charAt(0).toUpperCase() + word.slice(1);
   }).join(' ');
 }
+
+/**
+ * Get local today's date string in YYYY-MM-DD format
+ */
+export function getLocalTodayDateString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Get local current datetime string in YYYY-MM-DDTHH:MM format
+ */
+export function getLocalTodayDateTimeString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
