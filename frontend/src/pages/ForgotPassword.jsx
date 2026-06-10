@@ -29,7 +29,7 @@ export default function ForgotPassword() {
     setError(''); setLoading(true);
     try {
       await api.post('/auth/forgot-password', { email });
-      setMsg('OTP telah dikirim ke email Anda');
+      setMsg('OTP telah dikirim ke surel Anda');
       setStep(2);
       startCountdown();
     } catch (err) {
@@ -43,7 +43,7 @@ export default function ForgotPassword() {
     setError(''); setLoading(true);
     try {
       await api.post('/auth/resend-otp', { email });
-      setMsg('OTP baru telah dikirim ke email Anda');
+      setMsg('OTP baru telah dikirim ke surel Anda');
       startCountdown();
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal mengirim ulang OTP');
@@ -87,8 +87,8 @@ export default function ForgotPassword() {
         <div className="logo-icon"><img src="/logo.png" alt="Logo" /></div>
         <h1>Atur Ulang Kata Sandi</h1>
         <p className="subtitle">
-          {step === 1 && 'Masukkan email untuk menerima kode OTP'}
-          {step === 2 && 'Masukkan kode OTP yang dikirim ke email'}
+          {step === 1 && 'Masukkan surel untuk menerima kode OTP'}
+          {step === 2 && 'Masukkan kode OTP yang dikirim ke surel'}
           {step === 3 && 'Buat kata sandi baru'}
           {step === 4 && 'Kata sandi berhasil direset!'}
         </p>
@@ -97,7 +97,7 @@ export default function ForgotPassword() {
 
         {step === 1 && (
           <form onSubmit={sendOTP}>
-            <div className="form-group"><label>Email</label><input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} required /></div>
+            <div className="form-group"><label>Surel</label><input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} required /></div>
             <button className="btn btn-primary btn-full" disabled={loading}>Kirim OTP</button>
           </form>
         )}

@@ -169,7 +169,7 @@ export default function ManageUsers() {
 
       <div style={{ marginBottom: 16, position: 'relative', maxWidth: 400 }}>
         <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-        <input className="form-input" placeholder="Cari nama atau email..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+        <input className="form-input" placeholder="Cari nama atau surel..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
       </div>
 
       {filteredUsers.length === 0 ? (
@@ -179,7 +179,7 @@ export default function ManageUsers() {
           <table>
             <thead>
               <tr>
-                <th>Nama</th><th>Email</th><th>Peran</th>
+                <th>Nama</th><th>Surel</th><th>Peran</th>
                 <th>Jabatan</th>
                 <th>Dibuat</th>
                 <th>Aksi</th>
@@ -255,7 +255,7 @@ export default function ManageUsers() {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: 6, display: 'block' }}>
-                      Alamat Email *
+                      Alamat Surel *
                     </label>
                     <input
                       className="form-input"

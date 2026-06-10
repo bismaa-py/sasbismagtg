@@ -21,7 +21,7 @@ export default function Login() {
       if (result.success) {
         navigate('/dashboard');
       } else {
-        setError(result.message || 'Email atau kata sandi salah');
+        setError(result.message || 'Surel atau kata sandi salah');
         setPassword('');
       }
     } catch (err) {
@@ -48,8 +48,8 @@ export default function Login() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Email</label>
-            <input id="login-email" className="form-input" type="email" placeholder="Masukkan email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <label>Surel</label>
+            <input id="login-email" className="form-input" type="email" placeholder="Masukkan surel" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div className="form-group">
             <label>Kata Sandi</label>

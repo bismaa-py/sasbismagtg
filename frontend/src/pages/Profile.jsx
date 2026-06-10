@@ -150,7 +150,7 @@ export default function Profile() {
     setError(''); setMsg(''); setOtpSending(true);
     try {
       await api.post('/profile/send-otp');
-      setMsg('Kode OTP telah dikirim ke email Anda');
+      setMsg('Kode OTP telah dikirim ke surel Anda');
       setOtpStep(2);
       setOtpCountdown(60);
       const timer = setInterval(() => {
@@ -454,7 +454,7 @@ export default function Profile() {
             }}>
               {[
                 { icon: <User size={16} />, label: 'Nama Lengkap', value: user?.nama },
-                { icon: <Mail size={16} />, label: 'Alamat Email', value: user?.email },
+                { icon: <Mail size={16} />, label: 'Alamat Surel', value: user?.email },
                 {
                   icon: <Briefcase size={16} />, label: 'Jabatan',
                   value: allJabatan.length > 0
@@ -497,7 +497,7 @@ export default function Profile() {
             color: 'var(--text-muted)', fontSize: '0.78rem'
           }}>
             <Info size={14} />
-            Untuk mengubah nama, email, atau jabatan, silakan hubungi Administrator.
+            Untuk mengubah nama, surel, atau jabatan, silakan hubungi Administrator.
           </div>
         </div>
       )}
@@ -543,7 +543,7 @@ export default function Profile() {
                   Verifikasi Identitas
                 </h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: 28, lineHeight: 1.6 }}>
-                  Demi keamanan akun Anda, kami akan mengirimkan kode OTP ke alamat email
+                  Demi keamanan akun Anda, kami akan mengirimkan kode OTP ke alamat surel
                   <strong style={{ color: 'var(--text-primary)' }}> {user?.email}</strong>
                 </p>
                 <button

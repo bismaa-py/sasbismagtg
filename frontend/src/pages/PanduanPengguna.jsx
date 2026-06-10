@@ -8,9 +8,9 @@ const panduanAdmin = [
     title: 'Masuk ke Sistem',
     steps: [
       'Buka halaman login di browser.',
-      'Masukkan email dan kata sandi akun Admin/TU.',
+      'Masukkan surel dan kata sandi akun Admin/TU.',
       'Klik tombol "Masuk" untuk masuk ke dashboard.',
-      'Jika lupa kata sandi, klik "Lupa Kata Sandi?" untuk reset via OTP email.'
+      'Jika lupa kata sandi, klik "Lupa Kata Sandi?" untuk reset via OTP surel.'
     ]
   },
   {
@@ -94,7 +94,7 @@ const panduanAdmin = [
     steps: [
       'Buka menu "Profil" di sidebar.',
       'Klik ikon kamera untuk mengunggah atau mengubah foto profil.',
-      'Untuk ganti kata sandi: klik tab "Ganti Kata Sandi", kirim OTP ke email, lalu isi kata sandi baru.'
+      'Untuk ganti kata sandi: klik tab "Ganti Kata Sandi", kirim OTP ke surel, lalu isi kata sandi baru.'
     ]
   }
 ];
@@ -105,7 +105,7 @@ const panduanKepsek = [
     title: 'Masuk ke Sistem',
     steps: [
       'Buka halaman login di browser.',
-      'Masukkan email dan kata sandi akun Kepala Sekolah.',
+      'Masukkan surel dan kata sandi akun Kepala Sekolah.',
       'Klik "Masuk" untuk masuk ke dashboard.',
     ]
   },
@@ -166,7 +166,7 @@ const panduanUser = [
     title: 'Masuk ke Sistem',
     steps: [
       'Buka halaman login di browser.',
-      'Masukkan email dan kata sandi yang diberikan oleh Admin.',
+      'Masukkan surel dan kata sandi yang diberikan oleh Admin.',
       'Klik "Masuk" untuk masuk ke dashboard.',
     ]
   },
@@ -236,9 +236,9 @@ const panduanPegawai = [
     title: 'Masuk ke Sistem',
     steps: [
       'Buka halaman login di browser.',
-      'Masukkan email dan kata sandi akun Pegawai TU.',
+      'Masukkan surel dan kata sandi akun Pegawai TU.',
       'Klik tombol "Masuk" untuk masuk ke dashboard.',
-      'Jika lupa kata sandi, klik "Lupa Kata Sandi?" untuk reset via OTP email.'
+      'Jika lupa kata sandi, klik "Lupa Kata Sandi?" untuk reset via OTP surel.'
     ]
   },
   {
@@ -301,7 +301,7 @@ const panduanPegawai = [
     steps: [
       'Buka menu "Profil" di sidebar.',
       'Klik ikon kamera untuk mengunggah atau mengubah foto profil.',
-      'Untuk ganti kata sandi: klik tab "Ganti Kata Sandi", kirim OTP ke email, lalu isi kata sandi baru.'
+      'Untuk ganti kata sandi: klik tab "Ganti Kata Sandi", kirim OTP ke surel, lalu isi kata sandi baru.'
     ]
   }
 ];
@@ -312,7 +312,7 @@ const panduanWaka = [
     title: 'Masuk ke Sistem',
     steps: [
       'Buka halaman login di browser.',
-      'Masukkan email dan kata sandi akun Waka.',
+      'Masukkan surel dan kata sandi akun Waka.',
       'Klik "Masuk" untuk masuk ke dashboard.',
     ]
   },
