@@ -17,9 +17,13 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 func scanUser(row interface{ Scan(...interface{}) error }) (*models.User, error) {
 	user := &models.User{}
 	var role, namaJabatan, fotoProfil sql.NullString
-	err := row.Scan(&user.ID, &user.Nama, &user.Email, &user.Password, &user.CreatedAt, &role, &namaJabatan, &fotoProfil)
+	var createdAt sql.NullTime
+	err := row.Scan(&user.ID, &user.Nama, &user.Email, &user.Password, &createdAt, &role, &namaJabatan, &fotoProfil)
 	if err != nil {
 		return nil, err
+	}
+	if createdAt.Valid {
+		user.CreatedAt = createdAt.Time
 	}
 	if role.Valid {
 		user.Role = role.String
