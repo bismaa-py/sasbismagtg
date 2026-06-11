@@ -308,7 +308,7 @@ export default function SuratDetail({ type }) {
                   <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
                     {type === 'masuk' ? 'Surat Masuk' : 'Surat Keluar'}
                   </p>
-                  <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+                  <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#ffffff', margin: 0, wordBreak: 'break-all' }}>
                     {surat.no_surat}
                   </h2>
                 </div>
@@ -346,7 +346,7 @@ export default function SuratDetail({ type }) {
               borderLeft: '3px solid #0f2b52'
             }}>
               <p style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 4 }}>No Surat</p>
-              <p style={{ fontSize: '0.92rem', fontWeight: 600, color: '#1e293b' }}>{surat.no_surat}</p>
+              <p style={{ fontSize: '0.92rem', fontWeight: 600, color: '#1e293b', wordBreak: 'break-all' }}>{surat.no_surat}</p>
             </div>
 
             {/* Perihal */}

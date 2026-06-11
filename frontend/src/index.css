@@ -570,8 +570,8 @@ mark, .search-highlight {
   display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow);
 }
 .surat-card:hover { transform: translateY(-3px); border-color: var(--border-active); box-shadow: var(--shadow-lg); }
-.surat-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.surat-card-header .no-surat { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); }
+.surat-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.surat-card-header .no-surat { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); word-break: break-all; flex: 1; min-width: 0; }
 .surat-card .perihal { color: var(--text-secondary); font-size: 0.85rem; }
 .surat-card .meta { display: flex; gap: 16px; font-size: 0.8rem; color: var(--text-muted); }
 .surat-card .actions { display: flex; gap: 8px; margin-top: auto; }
@@ -691,3 +691,163 @@ tr:hover td { background: #f8fafc; }
 @media (max-width: 768px) {
   .sidebar.open ~ .sidebar-overlay { display: block; }
 }
+
+/* === CUSTOM DATE PICKER === */
+.date-picker-container {
+  position: relative;
+  display: inline-flex;
+}
+
+.date-picker-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  width: 290px;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 16px;
+  user-select: none;
+  animation: slideDown 0.15s ease;
+}
+
+.date-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.date-picker-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.date-picker-nav-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.date-picker-nav-btn:hover {
+  background: var(--bg-glass);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.date-picker-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.date-picker-weekday {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+.date-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.date-picker-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--transition);
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.date-picker-day:hover:not(:disabled) {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.date-picker-day-selected {
+  background: var(--accent) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.date-picker-day-today {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.date-picker-day-muted {
+  color: var(--text-muted);
+  opacity: 0.4;
+}
+
+.date-picker-day:disabled {
+  color: var(--text-muted);
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.date-picker-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+}
+
+.date-picker-footer-btn {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  border: none;
+  background: transparent;
+  text-align: center;
+}
+
+.date-picker-footer-btn-clear {
+  border: 1.5px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.date-picker-footer-btn-clear:hover {
+  background: var(--bg-glass);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.date-picker-footer-btn-today {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.date-picker-footer-btn-today:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+

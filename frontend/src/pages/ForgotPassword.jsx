@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import api from '../api/axios';
+import { useSchool } from '../context/SchoolContext';
+import { getUploadUrl } from '../utils/urlHelper';
 
 export default function ForgotPassword() {
+  const { schoolInfo } = useSchool();
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -84,7 +87,7 @@ export default function ForgotPassword() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="logo-icon"><img src="/logo.png" alt="Logo" /></div>
+        <div className="logo-icon"><img src={schoolInfo?.logo_sekolah ? getUploadUrl(schoolInfo.logo_sekolah) : "/logo.png"} alt="Logo" /></div>
         <h1>Atur Ulang Kata Sandi</h1>
         <p className="subtitle">
           {step === 1 && 'Masukkan surel untuk menerima kode OTP'}

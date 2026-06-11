@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
+import { useSchool } from '../context/SchoolContext';
+import { getUploadUrl } from '../utils/urlHelper';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -10,6 +12,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const { schoolInfo } = useSchool();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -35,10 +38,10 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="logo-icon">
-          <img src="/logo.png" alt="Logo SMKN 2 Singosari" />
+          <img src={schoolInfo?.logo_sekolah ? getUploadUrl(schoolInfo.logo_sekolah) : "/logo.png"} alt="Logo Sekolah" />
         </div>
         <h1>E-Disposisi Surat</h1>
-        <p className="subtitle">SMKN 2 Singosari Malang</p>
+        <p className="subtitle">{schoolInfo?.nama_sekolah || "SMKN 2 Singosari Malang"}</p>
 
         {error && (
           <div className="login-alert login-alert-error">

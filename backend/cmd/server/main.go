@@ -53,6 +53,20 @@ func main() {
 	db.Exec("ALTER TABLE disposisi ADD COLUMN IF NOT EXISTS catatan_waka TEXT DEFAULT ''")
 	db.Exec("ALTER TABLE disposisi ADD COLUMN IF NOT EXISTS id_waka INTEGER REFERENCES users(id_user)")
 
+	// Create school settings table if not exists, check that only id=1 can exist
+	db.Exec(`CREATE TABLE IF NOT EXISTS informasi_sekolah (
+		id INT PRIMARY KEY DEFAULT 1,
+		nama_sekolah VARCHAR(255) NOT NULL DEFAULT '',
+		logo_sekolah VARCHAR(500) NOT NULL DEFAULT '',
+		email_sekolah VARCHAR(255) NOT NULL DEFAULT '',
+		alamat_sekolah TEXT NOT NULL DEFAULT '',
+		telp_sekolah VARCHAR(50) NOT NULL DEFAULT '',
+		CONSTRAINT single_row CHECK (id = 1)
+	)`)
+	db.Exec(`INSERT INTO informasi_sekolah (id, nama_sekolah, logo_sekolah, email_sekolah, alamat_sekolah, telp_sekolah)
+		VALUES (1, 'SMKN 2 Singosari', '', 'info@smkn2singosari.sch.id', 'Jl. Raya Singosari No. 86, Singosari, Malang', '(0341) 458135')
+		ON CONFLICT (id) DO NOTHING`)
+
 	// Fix notifikasi jenis constraint to include all notification types
 	db.Exec("ALTER TABLE notifikasi DROP CONSTRAINT IF EXISTS notifikasi_jenis_check")
 	db.Exec(`ALTER TABLE notifikasi ADD CONSTRAINT notifikasi_jenis_check CHECK (
@@ -94,6 +108,7 @@ func main() {
 	notifRepo := repository.NewNotificationRepository(db)
 	actRepo := repository.NewActivityLogRepository(db)
 	otpRepo := repository.NewOTPRepository(db)
+	schoolRepo := repository.NewSchoolRepository(db)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, userRepo, otpRepo, actRepo)
@@ -105,6 +120,7 @@ func main() {
 	notifHandler := handlers.NewNotificationHandler(notifRepo)
 	actHandler := handlers.NewActivityHandler(actRepo)
 	dashHandler := handlers.NewDashboardHandler(smRepo, skRepo, userRepo, dispRepo)
+	schoolHandler := handlers.NewSchoolHandler(cfg, schoolRepo, actRepo)
 
 	// Setup Gin router
 	r := gin.Default()
@@ -121,6 +137,7 @@ func main() {
 		api.POST("/auth/resend-otp", authHandler.ResendOTP) // Feature 1
 		api.POST("/auth/verify-otp", authHandler.VerifyOTP)
 		api.POST("/auth/reset-password", authHandler.ResetPassword)
+		api.GET("/sekolah", schoolHandler.Get)
 
 		// Protected routes
 		auth := api.Group("")
@@ -178,6 +195,8 @@ func main() {
 				adminTU.PUT("/surat-masuk/:id/teruskan", smHandler.Forward)
 				adminTU.PUT("/surat-masuk/:id/arsip", smHandler.Archive)
 				adminTU.DELETE("/surat-masuk/:id", smHandler.Delete) // Feature 23
+				adminTU.PUT("/sekolah", schoolHandler.Update)
+				adminTU.POST("/sekolah/logo", schoolHandler.UploadLogo)
 			}
 
 			kepsek := auth.Group("")

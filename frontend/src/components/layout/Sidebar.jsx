@@ -4,8 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import { LayoutDashboard, Mail, Send, Users, ClipboardList, User, History, LogOut, AlertTriangle, RefreshCw, BookOpen, Briefcase } from 'lucide-react';
 import { formatJabatan } from '../../utils/formatDate';
 import { getUploadUrl } from '../../utils/urlHelper';
+import { useSchool } from '../../context/SchoolContext';
 export default function Sidebar({ open, onClose }) {
   const { user, logout, activeJabatanFilter, setActiveJabatanFilter } = useAuth();
+  const { schoolInfo } = useSchool();
   const navigate = useNavigate();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showJabatanModal, setShowJabatanModal] = useState(false);
@@ -68,11 +70,11 @@ export default function Sidebar({ open, onClose }) {
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo">
-            <img src="/logo.png" alt="Logo SMK" />
+            <img src={schoolInfo?.logo_sekolah ? getUploadUrl(schoolInfo.logo_sekolah) : "/logo.png"} alt="Logo SMK" />
           </div>
           <div className="app-name">
             E-Disposisi Surat
-            <span>SMKN 2 Singosari</span>
+            <span>{schoolInfo?.nama_sekolah || "SMKN 2 Singosari"}</span>
           </div>
         </div>
 

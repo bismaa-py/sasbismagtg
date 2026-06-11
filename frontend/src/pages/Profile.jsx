@@ -1,16 +1,83 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Camera, Send, ShieldCheck, ZoomIn, ZoomOut, Move, Trash2, Mail, Briefcase, Shield, Calendar, User, KeyRound, Info, CheckCircle } from 'lucide-react';
+import { Lock, Camera, Send, ShieldCheck, ZoomIn, ZoomOut, Move, Trash2, Mail, Briefcase, Shield, Calendar, User, KeyRound, Info, CheckCircle, School } from 'lucide-react';
 import api from '../api/axios';
 import { formatTanggalOnly, formatJabatan } from '../utils/formatDate';
 import { getUploadUrl } from '../utils/urlHelper';
+import { useSchool } from '../context/SchoolContext';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
+  const { schoolInfo, refreshSchoolInfo } = useSchool();
   const [tab, setTab] = useState('profil');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const fileRef = useRef(null);
+
+  const [schoolForm, setSchoolForm] = useState({
+    nama_sekolah: '',
+    email_sekolah: '',
+    alamat_sekolah: '',
+    telp_sekolah: ''
+  });
+  const [selectedLogoFile, setSelectedLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState('');
+  const [savingSchool, setSavingSchool] = useState(false);
+  const schoolLogoInputRef = useRef(null);
+
+  useEffect(() => {
+    if (schoolInfo) {
+      setSchoolForm({
+        nama_sekolah: schoolInfo.nama_sekolah || '',
+        email_sekolah: schoolInfo.email_sekolah || '',
+        alamat_sekolah: schoolInfo.alamat_sekolah || '',
+        telp_sekolah: schoolInfo.telp_sekolah || ''
+      });
+      setLogoPreview(schoolInfo.logo_sekolah ? getUploadUrl(schoolInfo.logo_sekolah) : '');
+      setSelectedLogoFile(null);
+    }
+  }, [schoolInfo]);
+
+  const handleSchoolSubmit = async (e) => {
+    e.preventDefault();
+    setMsg('');
+    setError('');
+    setSavingSchool(true);
+    try {
+      // 1. Upload logo first if a new one is selected
+      if (selectedLogoFile) {
+        const fd = new FormData();
+        fd.append('logo', selectedLogoFile);
+        const logoRes = await api.post('/sekolah/logo', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        if (!logoRes.data.success) {
+          throw new Error(logoRes.data.message || 'Gagal mengunggah logo sekolah');
+        }
+      }
+
+      // 2. Save text information
+      const res = await api.put('/sekolah', schoolForm);
+      if (res.data.success) {
+        setMsg('Informasi sekolah berhasil diperbarui');
+        setSelectedLogoFile(null);
+        await refreshSchoolInfo();
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Gagal memperbarui informasi sekolah');
+    } finally {
+      setSavingSchool(false);
+    }
+  };
+
+  const handleSchoolLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setMsg('');
+    setError('');
+    setSelectedLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
 
   // State crop foto
   const [showCropModal, setShowCropModal] = useState(false);
@@ -378,7 +445,8 @@ export default function Profile() {
       }}>
         {[
           { key: 'profil', icon: <User size={16} />, label: 'Informasi Profil' },
-          { key: 'password', icon: <KeyRound size={16} />, label: 'Keamanan Akun' }
+          { key: 'password', icon: <KeyRound size={16} />, label: 'Keamanan Akun' },
+          ...((user?.role === 'admin' || user?.role === 'pegawai') ? [{ key: 'sekolah', icon: <School size={16} />, label: 'Informasi Sekolah' }] : [])
         ].map(t => {
           const isActive = tab === t.key;
           return (
@@ -683,6 +751,164 @@ export default function Profile() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ INFORMASI SEKOLAH TAB ═══ */}
+      {tab === 'sekolah' && (user?.role === 'admin' || user?.role === 'pegawai') && (
+        <div style={{
+          borderRadius: 16, border: '1px solid var(--border-color)',
+          background: 'var(--bg-primary)', overflow: 'hidden',
+          boxShadow: '0 1px 8px rgba(0,0,0,0.04)'
+        }}>
+          {/* Section header */}
+          <div style={{
+            padding: '18px 24px', borderBottom: '1px solid var(--border-color)',
+            display: 'flex', alignItems: 'center', gap: 10
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: 'rgba(15, 43, 82, 0.06)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#0f2b52'
+            }}>
+              <School size={18} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Informasi Sekolah</h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Kelola identitas dan logo sekolah yang ditampilkan di web</p>
+            </div>
+          </div>
+
+          <div style={{ padding: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 32, alignItems: 'start' }}>
+              
+              {/* Logo Upload Section */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Logo Web Sekolah</div>
+                
+                <div 
+                  onClick={() => schoolLogoInputRef.current?.click()}
+                  style={{
+                    width: 160, height: 160, borderRadius: 16,
+                    border: '2px dashed var(--border-color)',
+                    background: '#f8fafc',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', overflow: 'hidden', position: 'relative',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = '#f1f5f9'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = '#f8fafc'; }}
+                >
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo Sekolah" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 12 }} />
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)' }}>
+                      <Camera size={32} style={{ marginBottom: 8, opacity: 0.6 }} />
+                      <span style={{ fontSize: '0.75rem' }}>Klik untuk Unggah Logo</span>
+                    </div>
+                  )}
+                  {savingSchool && selectedLogoFile && (
+                    <div style={{
+                      position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.8rem'
+                    }}>
+                      <span className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
+                    </div>
+                  )}
+                </div>
+                
+                <input 
+                  ref={schoolLogoInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleSchoolLogoChange}
+                  disabled={savingSchool}
+                />
+                
+                <button 
+                  type="button" 
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => schoolLogoInputRef.current?.click()}
+                  disabled={savingSchool}
+                  style={{ fontSize: '0.8rem' }}
+                >
+                  Pilih Gambar
+                </button>
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textAlign: 'center' }}>
+                  Direkomendasikan format PNG transparan dengan rasio persegi.
+                </small>
+              </div>
+
+              {/* Text Form Section */}
+              <form onSubmit={handleSchoolSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
+                    Nama Sekolah *
+                  </label>
+                  <input
+                    className="form-input"
+                    value={schoolForm.nama_sekolah}
+                    onChange={e => setSchoolForm({ ...schoolForm, nama_sekolah: e.target.value })}
+                    required
+                    placeholder="Masukkan nama sekolah..."
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
+                    Alamat Surel Sekolah
+                  </label>
+                  <input
+                    className="form-input"
+                    type="email"
+                    value={schoolForm.email_sekolah}
+                    onChange={e => setSchoolForm({ ...schoolForm, email_sekolah: e.target.value })}
+                    placeholder="sekolah@domain.com"
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
+                    Nomor Telepon Sekolah
+                  </label>
+                  <input
+                    className="form-input"
+                    value={schoolForm.telp_sekolah}
+                    onChange={e => setSchoolForm({ ...schoolForm, telp_sekolah: e.target.value })}
+                    placeholder="Contoh: (0341) 458135"
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
+                    Alamat Fisik Sekolah
+                  </label>
+                  <textarea
+                    className="form-input"
+                    value={schoolForm.alamat_sekolah}
+                    onChange={e => setSchoolForm({ ...schoolForm, alamat_sekolah: e.target.value })}
+                    placeholder="Masukkan alamat lengkap sekolah..."
+                    rows={3}
+                    style={{ resize: 'vertical', fontFamily: 'inherit', padding: '10px 14px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary"
+                    disabled={savingSchool}
+                    style={{ background: '#0f2b52', padding: '10px 24px', borderRadius: 12 }}
+                  >
+                    {savingSchool ? 'Menyimpan...' : 'Simpan Informasi'}
+                  </button>
+                </div>
+              </form>
+
+            </div>
           </div>
         </div>
       )}
