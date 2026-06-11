@@ -63,6 +63,12 @@ func main() {
 	db.Exec("UPDATE surat_keluar SET created_at = NOW() WHERE created_at IS NULL")
 	db.Exec("UPDATE surat_keluar SET updated_at = NOW() WHERE updated_at IS NULL")
 
+	// Fix nullable status_verifikasi and set defaults
+	db.Exec("ALTER TABLE surat_masuk ALTER COLUMN status_verifikasi SET DEFAULT 'menunggu'")
+	db.Exec("ALTER TABLE surat_keluar ALTER COLUMN status_verifikasi SET DEFAULT 'menunggu'")
+	db.Exec("UPDATE surat_masuk SET status_verifikasi = 'menunggu' WHERE status_verifikasi IS NULL OR status_verifikasi = ''")
+	db.Exec("UPDATE surat_keluar SET status_verifikasi = 'menunggu' WHERE status_verifikasi IS NULL OR status_verifikasi = ''")
+
 	// Create school settings table if not exists, check that only id=1 can exist
 	db.Exec(`CREATE TABLE IF NOT EXISTS informasi_sekolah (
 		id INT PRIMARY KEY DEFAULT 1,
