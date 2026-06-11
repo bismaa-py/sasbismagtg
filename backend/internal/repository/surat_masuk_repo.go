@@ -15,11 +15,22 @@ func NewSuratMasukRepository(db *sql.DB) *SuratMasukRepository {
 }
 
 func (r *SuratMasukRepository) Create(s *models.SuratMasuk) error {
-	return r.db.QueryRow(
+	var createdAt, updatedAt sql.NullTime
+	err := r.db.QueryRow(
 		`INSERT INTO surat_masuk (no_surat, perihal_surat, asal_surat, tanggal_surat, file_pdf)
 		 VALUES ($1,$2,$3,$4,$5) RETURNING id_surat_masuk, created_at, updated_at`,
 		s.NoSurat, s.PerihalSurat, s.AsalSurat, s.TanggalSurat, s.FilePDF,
-	).Scan(&s.ID, &s.CreatedAt, &s.UpdatedAt)
+	).Scan(&s.ID, &createdAt, &updatedAt)
+	if err != nil {
+		return err
+	}
+	if createdAt.Valid {
+		s.CreatedAt = createdAt.Time
+	}
+	if updatedAt.Valid {
+		s.UpdatedAt = updatedAt.Time
+	}
+	return nil
 }
 
 func scanSuratMasuk(row interface{ Scan(...interface{}) error }) (*models.SuratMasuk, error) {
@@ -28,13 +39,20 @@ func scanSuratMasuk(row interface{ Scan(...interface{}) error }) (*models.SuratM
 	var tglVerif sql.NullTime
 	var idDispAktif sql.NullInt64
 	var catatanVerif, tglDiterima, statusAlur sql.NullString
+	var createdAt, updatedAt sql.NullTime
 	err := row.Scan(
 		&s.ID, &s.NoSurat, &s.PerihalSurat, &s.AsalSurat, &s.TanggalSurat,
 		&s.FilePDF, &tglDiterima, &s.StatusVerifikasi, &userVerif, &tglVerif,
-		&catatanVerif, &s.CreatedAt, &idDispAktif, &statusAlur, &s.UpdatedAt,
+		&catatanVerif, &createdAt, &idDispAktif, &statusAlur, &updatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	if createdAt.Valid {
+		s.CreatedAt = createdAt.Time
+	}
+	if updatedAt.Valid {
+		s.UpdatedAt = updatedAt.Time
 	}
 	if userVerif.Valid {
 		v := int(userVerif.Int64)
@@ -454,17 +472,20 @@ func (r *SuratMasukRepository) FindByRecipientUserWithDateRange(userID int, date
 		var tglVerif sql.NullTime
 		var idDispAktif sql.NullInt64
 		var catatanVerif, tglDiterima, statusAlur sql.NullString
+		var createdAt, updatedAt sql.NullTime
 		var dispID int
 		var dispStatus string
 		err := rows.Scan(
 			&s.ID, &s.NoSurat, &s.PerihalSurat, &s.AsalSurat, &s.TanggalSurat,
 			&s.FilePDF, &tglDiterima, &s.StatusVerifikasi, &userVerif, &tglVerif,
-			&catatanVerif, &s.CreatedAt, &idDispAktif, &statusAlur, &s.UpdatedAt,
+			&catatanVerif, &createdAt, &idDispAktif, &statusAlur, &updatedAt,
 			&dispID, &dispStatus,
 		)
 		if err != nil {
 			return nil, err
 		}
+		if createdAt.Valid { s.CreatedAt = createdAt.Time }
+		if updatedAt.Valid { s.UpdatedAt = updatedAt.Time }
 		if userVerif.Valid { v := int(userVerif.Int64); s.UserVerifikasi = &v }
 		if tglVerif.Valid { s.TanggalVerifikasi = &tglVerif.Time }
 		if idDispAktif.Valid { v := int(idDispAktif.Int64); s.IDDisposisiAktif = &v }

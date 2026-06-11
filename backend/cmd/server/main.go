@@ -53,6 +53,16 @@ func main() {
 	db.Exec("ALTER TABLE disposisi ADD COLUMN IF NOT EXISTS catatan_waka TEXT DEFAULT ''")
 	db.Exec("ALTER TABLE disposisi ADD COLUMN IF NOT EXISTS id_waka INTEGER REFERENCES users(id_user)")
 
+	// Fix nullable timestamps and set defaults
+	db.Exec("ALTER TABLE surat_masuk ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP")
+	db.Exec("ALTER TABLE surat_masuk ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP")
+	db.Exec("ALTER TABLE surat_keluar ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP")
+	db.Exec("ALTER TABLE surat_keluar ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP")
+	db.Exec("UPDATE surat_masuk SET created_at = NOW() WHERE created_at IS NULL")
+	db.Exec("UPDATE surat_masuk SET updated_at = NOW() WHERE updated_at IS NULL")
+	db.Exec("UPDATE surat_keluar SET created_at = NOW() WHERE created_at IS NULL")
+	db.Exec("UPDATE surat_keluar SET updated_at = NOW() WHERE updated_at IS NULL")
+
 	// Create school settings table if not exists, check that only id=1 can exist
 	db.Exec(`CREATE TABLE IF NOT EXISTS informasi_sekolah (
 		id INT PRIMARY KEY DEFAULT 1,

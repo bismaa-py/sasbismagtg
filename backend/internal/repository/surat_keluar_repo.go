@@ -19,14 +19,21 @@ func scanSuratKeluar(row interface{ Scan(...interface{}) error }) (*models.Surat
 	var userVerif sql.NullInt64
 	var tglVerif sql.NullTime
 	var catatan, tujuan, catatanVerif, statusAlur sql.NullString
+	var createdAt, updatedAt sql.NullTime
 	err := row.Scan(
 		&s.ID, &s.KodeSurat, &s.NoSurat, &s.Perihal, &catatan,
 		&s.TanggalSurat, &s.FilePDF, &s.StatusVerifikasi,
 		&userVerif, &tglVerif, &tujuan, &catatanVerif,
-		&s.CreatedAt, &s.UpdatedAt, &statusAlur,
+		&createdAt, &updatedAt, &statusAlur,
 	)
 	if err != nil {
 		return nil, err
+	}
+	if createdAt.Valid {
+		s.CreatedAt = createdAt.Time
+	}
+	if updatedAt.Valid {
+		s.UpdatedAt = updatedAt.Time
 	}
 	if userVerif.Valid {
 		v := int(userVerif.Int64)
@@ -57,11 +64,22 @@ const skSelectQuery = `SELECT id_surat_keluar, kode_surat, no_surat, perihal, ca
 	FROM surat_keluar`
 
 func (r *SuratKeluarRepository) Create(s *models.SuratKeluar) error {
-	return r.db.QueryRow(
+	var createdAt, updatedAt sql.NullTime
+	err := r.db.QueryRow(
 		`INSERT INTO surat_keluar (kode_surat, no_surat, perihal, tanggal_surat, file_pdf, tujuan, catatan)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id_surat_keluar, created_at, updated_at`,
 		s.KodeSurat, s.NoSurat, s.Perihal, s.TanggalSurat, s.FilePDF, s.Tujuan, s.Catatan,
-	).Scan(&s.ID, &s.CreatedAt, &s.UpdatedAt)
+	).Scan(&s.ID, &createdAt, &updatedAt)
+	if err != nil {
+		return err
+	}
+	if createdAt.Valid {
+		s.CreatedAt = createdAt.Time
+	}
+	if updatedAt.Valid {
+		s.UpdatedAt = updatedAt.Time
+	}
+	return nil
 }
 
 func (r *SuratKeluarRepository) FindByID(id int) (*models.SuratKeluar, error) {
