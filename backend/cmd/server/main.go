@@ -53,6 +53,12 @@ func main() {
 	db.Exec("ALTER TABLE disposisi ADD COLUMN IF NOT EXISTS catatan_waka TEXT DEFAULT ''")
 	db.Exec("ALTER TABLE disposisi ADD COLUMN IF NOT EXISTS id_waka INTEGER REFERENCES users(id_user)")
 
+	// Fix otp table defaults for remote databases
+	db.Exec("ALTER TABLE otp ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP")
+	db.Exec("ALTER TABLE otp ALTER COLUMN is_used SET DEFAULT FALSE")
+	db.Exec("UPDATE otp SET created_at = NOW() WHERE created_at IS NULL")
+	db.Exec("UPDATE otp SET is_used = FALSE WHERE is_used IS NULL")
+
 	// Fix nullable timestamps and set defaults
 	db.Exec("ALTER TABLE surat_masuk ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP")
 	db.Exec("ALTER TABLE surat_masuk ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP")
